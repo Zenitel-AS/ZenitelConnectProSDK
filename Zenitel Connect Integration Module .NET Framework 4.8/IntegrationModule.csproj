@@ -1,322 +1,341 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{8E3EF316-5E3A-40BD-88E0-D93423B1165D}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Zenitel.IntegrationModule</RootNamespace>
-    <AssemblyName>Zenitel.IntegrationModule</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Deterministic>true</Deterministic>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>ZenitelConnectIntegrationModule.snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x86\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <DebugType>full</DebugType>
-    <PlatformTarget>x86</PlatformTarget>
-    <LangVersion>7.3</LangVersion>
-    <ErrorReport>prompt</ErrorReport>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
-    <OutputPath>bin\x86\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>x86</PlatformTarget>
-    <LangVersion>7.3</LangVersion>
-    <ErrorReport>prompt</ErrorReport>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.ComponentModel.Composition">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.ComponentModel.DataAnnotations">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Core">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Drawing">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.IdentityModel">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.IO.Compression.FileSystem">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Numerics">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Security" />
-    <Reference Include="System.Transactions">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Windows.Forms">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xml.Linq">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Data.DataSetExtensions">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Microsoft.CSharp">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Data">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xml">
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Configuration.cs" />
-    <Compile Include="Core.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="ZenitelConnectIntegrationModule.snk" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\WampClient\WampClient.csproj">
-      <Project>{a42427c2-3efe-45c4-86fd-5388b8135ddb}</Project>
-      <Name>WampClient</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Azure.Identity">
-      <Version>1.13.2</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Bcl.HashCode">
-      <Version>6.0.0</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Bcl.Memory">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Bcl.TimeProvider">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.CSharp">
-      <Version>4.7.0</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Data.SqlClient">
-      <Version>6.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Data.Sqlite.Core">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.DotNet.PlatformAbstractions">
-      <Version>3.1.6</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect">
-      <Version>8.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.NETCore.Platforms">
-      <Version>7.0.4</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Win32.Primitives">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="NETStandard.Library">
-      <Version>2.0.3</Version>
-    </PackageReference>
-    <PackageReference Include="Newtonsoft.Json">
-      <Version>13.0.3</Version>
-    </PackageReference>
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3">
-      <Version>2.1.10</Version>
-    </PackageReference>
-    <PackageReference Include="System.AppContext">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.ClientModel">
-      <Version>1.2.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Collections">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Collections.Concurrent">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.ComponentModel.Annotations">
-      <Version>5.0.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Configuration.ConfigurationManager">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Console">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Data.Common">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Diagnostics.Debug">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Diagnostics.Tools">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Diagnostics.Tracing">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Globalization">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Globalization.Calendars">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.IO.Compression">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.IO.Compression.ZipFile">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.IO.FileSystem">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Linq">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Linq.Expressions">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Memory">
-      <Version>4.6.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Memory.Data">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Net.Http">
-      <Version>4.3.4</Version>
-    </PackageReference>
-    <PackageReference Include="System.Net.Primitives">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Net.Sockets">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.ObjectModel">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Reflection">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Reflection.Extensions">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Reflection.Primitives">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Resources.ResourceManager">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.Extensions">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.Handles">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.InteropServices">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.InteropServices.RuntimeInformation">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.Numerics">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Security.AccessControl">
-      <Version>6.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.Algorithms">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.Pkcs">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.X509Certificates">
-      <Version>4.3.2</Version>
-    </PackageReference>
-    <PackageReference Include="System.Text.Encoding">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Text.Encoding.Extensions">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Text.RegularExpressions">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading.Tasks">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading.Tasks.Extensions">
-      <Version>4.6.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading.Timer">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Xml.ReaderWriter">
-      <Version>4.3.1</Version>
-    </PackageReference>
-    <PackageReference Include="System.Xml.XDocument">
-      <Version>4.3.0</Version>
-    </PackageReference>
-  </ItemGroup>
-  <Import Project="..\SharedComponents\SharedComponents.projitems" Label="Shared" />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+	<Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+	<PropertyGroup>
+		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+		<ProjectGuid>{8E3EF316-5E3A-40BD-88E0-D93423B1165D}</ProjectGuid>
+		<OutputType>Library</OutputType>
+		<AppDesignerFolder>Properties</AppDesignerFolder>
+		<RootNamespace>Zenitel.IntegrationModule</RootNamespace>
+		<AssemblyName>Zenitel.ConnectPro.SDK</AssemblyName>
+		<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+		<FileAlignment>512</FileAlignment>
+		<Deterministic>true</Deterministic>
+		<NuGetPackageImportStamp>
+		</NuGetPackageImportStamp>
+	</PropertyGroup>
+	<PropertyGroup>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<!-- Embed sources not in source control -->
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<!-- Publish the repository URL -->
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+		<!-- For CI builds -->
+		<RepositoryUrl>https://github.com/Zenitel-AS/ZenitelConnectProSDK.git</RepositoryUrl>
+		<!-- Replace with your repository URL -->
+		<RepositoryType>git</RepositoryType>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+		<DebugSymbols>true</DebugSymbols>
+		<DebugType>full</DebugType>
+		<Optimize>false</Optimize>
+		<OutputPath>bin\Debug\</OutputPath>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<DebugType>portable</DebugType>
+		<Optimize>true</Optimize>
+		<OutputPath>bin\Release\</OutputPath>
+		<DefineConstants>TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+	</PropertyGroup>
+	<PropertyGroup>
+		<SignAssembly>true</SignAssembly>
+	</PropertyGroup>
+	<PropertyGroup>
+		<AssemblyOriginatorKeyFile>ZenitelConnectIntegrationModule.snk</AssemblyOriginatorKeyFile>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+		<DebugSymbols>true</DebugSymbols>
+		<OutputPath>bin\x86\Debug\</OutputPath>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<DebugType>full</DebugType>
+		<PlatformTarget>x86</PlatformTarget>
+		<LangVersion>7.3</LangVersion>
+		<ErrorReport>prompt</ErrorReport>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+		<OutputPath>bin\x86\Release\</OutputPath>
+		<DefineConstants>TRACE</DefineConstants>
+		<Optimize>true</Optimize>
+		<DebugType>portable</DebugType>
+		<PlatformTarget>x86</PlatformTarget>
+		<LangVersion>7.3</LangVersion>
+		<ErrorReport>prompt</ErrorReport>
+	</PropertyGroup>
+	<PropertyGroup>
+		<ApplicationIcon>ZenitelLogo.ico</ApplicationIcon>
+		<PackageIcon>icon.png</PackageIcon>
+	</PropertyGroup>
+	<ItemGroup>
+		<Reference Include="System">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.ComponentModel.Composition">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.ComponentModel.DataAnnotations">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Configuration" />
+		<Reference Include="System.Core">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Drawing">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.IdentityModel">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.IO.Compression.FileSystem">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Numerics">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Security" />
+		<Reference Include="System.Transactions">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Windows.Forms">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Xml.Linq">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Data.DataSetExtensions">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="Microsoft.CSharp">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Data">
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="System.Xml">
+			<Private>False</Private>
+		</Reference>
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Include="Configuration.cs" />
+		<Compile Include="Core.cs" />
+		<Compile Include="Properties\AssemblyInfo.cs" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="App.config" />
+		<None Include="ZenitelConnectIntegrationModule.snk" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\WampClient\WampClient.csproj">
+			<Project>{a42427c2-3efe-45c4-86fd-5388b8135ddb}</Project>
+			<Name>WampClient</Name>
+		</ProjectReference>
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Azure.Identity">
+			<Version>1.13.2</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Bcl.HashCode">
+			<Version>6.0.0</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Bcl.Memory">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Bcl.TimeProvider">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.CSharp">
+			<Version>4.7.0</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Data.SqlClient">
+			<Version>6.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Data.Sqlite.Core">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.DotNet.PlatformAbstractions">
+			<Version>3.1.6</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.Configuration">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect">
+			<Version>8.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.NETCore.Platforms">
+			<Version>7.0.4</Version>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Win32.Primitives">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="NETStandard.Library">
+			<Version>2.0.3</Version>
+		</PackageReference>
+		<PackageReference Include="Newtonsoft.Json">
+			<Version>13.0.3</Version>
+		</PackageReference>
+		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3">
+			<Version>2.1.10</Version>
+		</PackageReference>
+		<PackageReference Include="System.AppContext">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.ClientModel">
+			<Version>1.2.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Collections">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Collections.Concurrent">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.ComponentModel.Annotations">
+			<Version>5.0.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Configuration.ConfigurationManager">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Console">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Data.Common">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Diagnostics.Debug">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Diagnostics.Tools">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Diagnostics.Tracing">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Globalization">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Globalization.Calendars">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.IO.Compression">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.IO.Compression.ZipFile">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.IO.FileSystem">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Linq">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Linq.Expressions">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Memory">
+			<Version>4.6.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Memory.Data">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Net.Http">
+			<Version>4.3.4</Version>
+		</PackageReference>
+		<PackageReference Include="System.Net.Primitives">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Net.Sockets">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.ObjectModel">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Reflection">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Reflection.Extensions">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Reflection.Primitives">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Resources.ResourceManager">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Runtime">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Runtime.Extensions">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Runtime.Handles">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Runtime.InteropServices">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Runtime.InteropServices.RuntimeInformation">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Runtime.Numerics">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Security.AccessControl">
+			<Version>6.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Security.Cryptography.Algorithms">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Security.Cryptography.Pkcs">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Security.Cryptography.ProtectedData">
+			<Version>9.0.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Security.Cryptography.X509Certificates">
+			<Version>4.3.2</Version>
+		</PackageReference>
+		<PackageReference Include="System.Text.Encoding">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Text.Encoding.Extensions">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Text.RegularExpressions">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Threading">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Threading.Tasks">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Threading.Tasks.Extensions">
+			<Version>4.6.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Threading.Timer">
+			<Version>4.3.0</Version>
+		</PackageReference>
+		<PackageReference Include="System.Xml.ReaderWriter">
+			<Version>4.3.1</Version>
+		</PackageReference>
+		<PackageReference Include="System.Xml.XDocument">
+			<Version>4.3.0</Version>
+		</PackageReference>
+	</ItemGroup>
+	<ItemGroup>
+		<Content Include="ZenitelLogo.ico" />
+		<None Include="icon.png" Pack="true" PackagePath="/" />
+	</ItemGroup>
+	<Import Project="..\SharedComponents\SharedComponents.projitems" Label="Shared" />
+	<Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
