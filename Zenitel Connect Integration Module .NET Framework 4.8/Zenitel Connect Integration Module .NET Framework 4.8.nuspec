@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>1.0</version>
+    <title>Zenitel ConnectPro Integration Module</title>
+    <authors>Zenitel</authors>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <license type="expression">Custom</license>
+    <!-- <icon>icon.png</icon> -->
+    <projectUrl>https://git.zenitel.com/Toni.Gregov/zenitel-connect-integration-module</projectUrl>
+    <description>Zenitel ConnectPro integration module </description>
+    <releaseNotes></releaseNotes>
+    <copyright>Zenitel © 2023</copyright>
+    <tags>SDK</tags>
+  </metadata>
+</package>

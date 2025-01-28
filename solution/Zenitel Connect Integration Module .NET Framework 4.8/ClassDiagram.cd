@@ -1,0 +1,167 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="ConnectPro.Core">
+    <Position X="7.5" Y="2" Width="1.5" />
+    <AssociationLine Name="DeviceHandler" Type="ConnectPro.Handlers.DeviceHandler" FixedFromPoint="true" FixedToPoint="true">
+      <Path>
+        <Point X="8.688" Y="5.353" />
+        <Point X="8.688" Y="5.781" />
+        <Point X="11.25" Y="5.781" />
+      </Path>
+    </AssociationLine>
+    <AssociationLine Name="Events" Type="ConnectPro.Events" FixedFromPoint="true" FixedToPoint="true">
+      <Path>
+        <Point X="8.125" Y="5.353" />
+        <Point X="8.125" Y="10.04" />
+        <Point X="9" Y="10.04" />
+      </Path>
+    </AssociationLine>
+    <TypeIdentifier>
+      <HashCode>AEAAAAAAACAKQEAAAAAAAAAAQhhAAABAgIEAgAAAAJA=</HashCode>
+      <FileName>Core.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="AccessControlHandler" />
+      <Property Name="BroadcastingHandler" />
+      <Property Name="CallHandler" />
+      <Property Name="ConnectionHandler" />
+      <Property Name="DatabaseHandler" />
+      <Property Name="DeviceHandler" />
+      <Property Name="Collection" />
+      <Property Name="Configuration" />
+      <Property Name="Events" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="ConnectPro.Handlers.AccessControlHandler" Collapsed="true">
+    <Position X="11.25" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAAAAAAAAAAAAAAAAAABAAAAAEAAAAAAAAAAgAAAIA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Handlers\AccessControlHandler.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Handlers.BroadcastingHandler" Collapsed="true">
+    <Position X="11.25" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEABAAAEAAAAAEAEEAAKAAoAACGAAAAEAAAAAgAAEIA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Handlers\BroadcastingHandler.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Handlers.CallHandler" Collapsed="true">
+    <Position X="11.25" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>hEQAAAgBkAAAAEACQAKAAFAQGgIBMgAAAgFAAgABAIA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Handlers\CallHandler.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.ConnectionHandler" Collapsed="true">
+    <Position X="11.25" Y="4" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAAEAJIAAAAQEBAACAAAAAAAQAAAAAAAAEAAgAAAIQ=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Handlers\ConnectionHandler.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Handlers.DatabaseHandler" Collapsed="true">
+    <Position X="11.25" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Handlers\DatabaseHandler.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Handlers.DeviceHandler" Collapsed="true">
+    <Position X="11.25" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAEAAAACAAAAEEAACAAAAAIACAABAABAAACAgAAAIA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Handlers\DeviceHandler.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Collections">
+    <Position X="5" Y="2" Width="1.5" />
+    <AssociationLine Name="ActiveCalls" Type="ConnectPro.Models.Device" ManuallyRouted="true" FixedFromPoint="true" FixedToPoint="true">
+      <Path>
+        <Point X="5" Y="2.75" />
+        <Point X="4.57" Y="2.75" />
+        <Point X="4.57" Y="2.188" />
+        <Point X="2" Y="2.188" />
+      </Path>
+    </AssociationLine>
+    <AssociationLine Name="RegisteredDevices" Type="ConnectPro.Models.Device" ManuallyRouted="true" FixedFromPoint="true" FixedToPoint="true">
+      <Path>
+        <Point X="5" Y="2.438" />
+        <Point X="4.774" Y="2.438" />
+        <Point X="4.774" Y="1.875" />
+        <Point X="2" Y="1.875" />
+      </Path>
+    </AssociationLine>
+    <TypeIdentifier>
+      <HashCode>AAACAEAAAABAAAAAhAgAAIAAAAAAABAAAAACAAAAAAA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Collections\Collections.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsCollectionAssociation>
+      <Property Name="ActiveCalls" />
+      <Property Name="AudioMessages" />
+      <Property Name="CallQueue" />
+      <Property Name="DirectoryNumbers" />
+      <Property Name="Groups" />
+      <Property Name="RegisteredDevices" />
+    </ShowAsCollectionAssociation>
+  </Class>
+  <Class Name="ConnectPro.Models.Device" Collapsed="true">
+    <Position X="0.5" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAAAAAAAIAAAUAAgAACAEAEAgACEBAAAAAgAgA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Models\Device.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Models.AudioMessage" Collapsed="true">
+    <Position X="0.5" Y="2.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACAAAAAAACAABAIEAAAAAAgAQAAAAABBBAgABAAAA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Models\AudioMessage.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="ConnectPro.Models.CallLegElement" Collapsed="true">
+    <Position X="0.5" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAggQAIEAAAAAAAAAAAGAEIBAEAAAAAAAEIAA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Models\CallLegElement.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Models.DirectoryNumber" Collapsed="true">
+    <Position X="0.5" Y="4.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACEAAAAAAAAAAAAEAAAAAAAAAAAAAABBAAAAAAAAA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Models\DirectoryNumber.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Models.Group" Collapsed="true">
+    <Position X="0.5" Y="5.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACEAAAAAAAACAEoEAAAAAAgAAACAAABBAGAAAAAAA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Models\Group.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="ConnectPro.Configuration">
+    <Position X="5" Y="7" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABA=</HashCode>
+      <FileName>Configuration.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Models.Configuration">
+    <Position X="2.25" Y="7" Width="2.5" />
+    <TypeIdentifier>
+      <HashCode>QCgAAABBAAQAgAAAAAAAAAAACAAAAAASAQAAAQAAIBA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Models\Configuration.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ConnectPro.Events">
+    <Position X="9" Y="7" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>ABAgAEAACCAAACAADAAgAQARARAEgACACAAAAQAAAEA=</HashCode>
+      <FileName>C:\Users\Toni.Gregov\source\repos\zenitel-connect-integration-module\SharedComponents\Events\Events.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

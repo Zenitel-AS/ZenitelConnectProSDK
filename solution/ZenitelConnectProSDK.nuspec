@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>ZenitelConnectProSDK</id>
+    <version>1.0.0</version>
+    <authors>Zenitel</authors>
+    <owners>Zenitel</owners>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/xenoprovider/ZenitelConnect</projectUrl>
+    <tags>SDK Integration Zenitel Connect Pro Intercom PAVA Critical Communication PublicAddress Safety Security</tags>
+    <description>Integration SDK for Zenitel Connect. This SDK facilitates seamless integration of intercom, PAVA, and communication systems with other platforms.</description>
+    <releaseNotes>Initial release of the Zenitel Connect Pro SDK.</releaseNotes>
+    <readme>readme.md</readme>
+  </metadata>
+  <files>
+    <file src="readme.md" target="." />
+    <file src="WampClient/bin/Release/WampClient.dll" target="lib/net48" />
+    <file src="Zenitel Connect Integration Module .NET Framework 4.8/bin/Release/ZCP_IntegrationModule.NET48.dll" target="lib/net48" />
+    <file src="Zenitel Connect Integration Module .NET Framework 4.8/bin/Release/Newtonsoft.Json.dll" target="lib/net48" />
+  </files>
+</package>
