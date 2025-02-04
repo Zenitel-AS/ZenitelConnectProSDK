@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.1;net48</TargetFrameworks>
+    <AssemblyName>Zenitel.ConnectPro.SDK</AssemblyName>
+    <RootNamespace>Zenitel.IntegrationModule</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\Zenitel.ConnectPro.SDK.xml</DocumentationFile>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <RepositoryUrl>https://github.com/Zenitel-AS/ZenitelConnectProSDK.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>ZenitelConnectIntegrationModule.snk</AssemblyOriginatorKeyFile>
+    <ApplicationIcon>ZenitelLogo.ico</ApplicationIcon>
+    <PackageIcon>icon.png</PackageIcon>
+    <Deterministic>true</Deterministic>
+    <LangVersion>7.3</LangVersion>
+    <Authors>Zenitel Integrations</Authors>
+    <Description>A comprehensive SDK for integrating Zenitel Connect Pro with third-party systems. It provides tools for managing intercom, PA systems, and event-driven workflows, ensuring seamless communication and integration.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IncludeSymbols>true</IncludeSymbols> <!-- Includes .pdb in the .nupkg -->
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat> <!-- Generates .snupkg -->
+    <Deterministic>true</Deterministic> <!-- Ensures builds are reproducible -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="ZenitelLogo.ico" />
+    <Content Include="icon.png" Pack="true" PackagePath="/">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Connections.Abstractions" Version="3.1.32" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.1.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.1.32" />
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Buffers" Version="4.6.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.7.1" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="System.IO.Pipelines" Version="4.7.5" />
+    <PackageReference Include="System.Memory" Version="4.6.0" />
+    <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.6.0" />
+    <PackageReference Include="System.Reactive" Version="6.0.1" />
+    <PackageReference Include="System.Reflection.DispatchProxy" Version="4.8.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.0" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.11.1" />
+    <PackageReference Include="WebSocket4Net" Version="0.15.2" />
+  </ItemGroup>
+
+  <Import Project="..\SharedComponents\SharedComponents.projitems" Label="Shared" />
+
+</Project>
