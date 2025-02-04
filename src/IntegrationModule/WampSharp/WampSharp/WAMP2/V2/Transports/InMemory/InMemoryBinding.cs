@@ -1,4 +1,5 @@
-﻿using WampSharp.Core.Message;
+﻿#pragma warning disable CS1591
+using WampSharp.Core.Message;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Binding;
 

@@ -1,4 +1,5 @@
-﻿using WampSharp.Core.Proxy;
+﻿#pragma warning disable CS1591
+using WampSharp.Core.Proxy;
 using WampSharp.Core.Serialization;
 
 namespace WampSharp.V2.Core.Serialization

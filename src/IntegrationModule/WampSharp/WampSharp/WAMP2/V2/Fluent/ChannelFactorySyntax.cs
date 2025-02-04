@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System.ComponentModel;
 
 namespace WampSharp.V2.Fluent

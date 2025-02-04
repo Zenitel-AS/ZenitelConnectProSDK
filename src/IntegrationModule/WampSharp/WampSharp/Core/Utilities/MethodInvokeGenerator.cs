@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -10,7 +11,7 @@ namespace WampSharp.Core.Utilities
     public static class MethodInvokeGenerator
     {
         private static readonly MethodInvokeGenerator<object> mInvokeGenerator = new MethodInvokeGenerator<object>();
-        private static readonly TaskMethodInvokeGenerator mTaskInvokeGenerator = new TaskMethodInvokeGenerator(); 
+        private static readonly TaskMethodInvokeGenerator mTaskInvokeGenerator = new TaskMethodInvokeGenerator();
 
 #pragma warning disable 162
 

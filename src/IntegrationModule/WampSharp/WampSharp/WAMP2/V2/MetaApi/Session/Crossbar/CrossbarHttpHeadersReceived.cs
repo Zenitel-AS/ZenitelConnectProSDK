@@ -1,4 +1,5 @@
-﻿using System.Runtime.Serialization;
+﻿#pragma warning disable CS1591
+using System.Runtime.Serialization;
 
 namespace WampSharp.V2.MetaApi
 {

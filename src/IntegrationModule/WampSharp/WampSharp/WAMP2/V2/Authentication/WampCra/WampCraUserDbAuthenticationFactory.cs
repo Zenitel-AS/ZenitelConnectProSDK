@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System.Linq;
 using WampSharp.V2.Core.Contracts;
 

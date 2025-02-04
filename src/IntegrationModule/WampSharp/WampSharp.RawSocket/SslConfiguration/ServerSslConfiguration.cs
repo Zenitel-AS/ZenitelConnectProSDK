@@ -1,4 +1,5 @@
-﻿using System.Security.Authentication;
+﻿#pragma warning disable CS1591
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
 namespace WampSharp.RawSocket

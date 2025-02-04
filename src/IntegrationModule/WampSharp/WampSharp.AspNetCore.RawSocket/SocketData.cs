@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;

@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using WampSharp.V2.Authentication;
 
 namespace WampSharp.Core.Listener

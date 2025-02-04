@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using WampSharp.Core.Cra;
 
 namespace WampSharp.V2.Authentication

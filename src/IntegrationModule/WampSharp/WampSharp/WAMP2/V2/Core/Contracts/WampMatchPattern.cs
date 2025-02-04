@@ -1,4 +1,5 @@
-﻿namespace WampSharp.V2.Core.Contracts
+﻿#pragma warning disable CS1591
+namespace WampSharp.V2.Core.Contracts
 {
     public static class WampMatchPattern
     {

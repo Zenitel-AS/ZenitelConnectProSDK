@@ -1,4 +1,5 @@
-﻿using System;
+﻿#pragma warning disable CS1591
+using System;
 using System.Collections.Generic;
 using WampSharp.Logging;
 using WampSharp.V2.Binding;

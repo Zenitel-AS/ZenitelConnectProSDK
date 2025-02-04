@@ -1,4 +1,5 @@
 ﻿using System;
+#pragma warning disable CS1591
 using System.Reactive.Disposables;
 using System.Threading.Tasks;
 using WampSharp.V2.Core;

@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using WampSharp.Core.Listener;
+#pragma warning disable CS1591
 using WampSharp.Core.Message;
 using WampSharp.Logging;
 using WampSharp.V2.Authentication;

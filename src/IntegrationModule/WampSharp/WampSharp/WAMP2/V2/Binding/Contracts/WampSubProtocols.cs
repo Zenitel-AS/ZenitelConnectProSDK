@@ -1,4 +1,5 @@
-﻿namespace WampSharp.V2.Binding.Contracts
+﻿#pragma warning disable CS1591
+namespace WampSharp.V2.Binding.Contracts
 {
     public static class WampSubProtocols
     {

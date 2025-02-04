@@ -1,4 +1,5 @@
-﻿using WampSharp.V2.Binding;
+﻿#pragma warning disable CS1591
+using WampSharp.V2.Binding;
 using WampSharp.V2.Core.Contracts;
 
 namespace WampSharp.V2.Realm

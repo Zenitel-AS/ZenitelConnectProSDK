@@ -1,4 +1,5 @@
-﻿using WampSharp.V2.Binding.Parsers;
+﻿#pragma warning disable CS1591
+using WampSharp.V2.Binding.Parsers;
 
 namespace WampSharp.V2.Binding
 {

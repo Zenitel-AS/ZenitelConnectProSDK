@@ -1,4 +1,5 @@
-﻿using WampSharp.V2.PubSub;
+﻿#pragma warning disable CS1591
+using WampSharp.V2.PubSub;
 using WampSharp.V2.Rpc;
 
 namespace WampSharp.V2.Realm

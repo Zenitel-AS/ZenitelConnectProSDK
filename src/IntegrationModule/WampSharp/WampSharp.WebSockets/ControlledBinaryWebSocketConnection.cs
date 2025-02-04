@@ -1,4 +1,5 @@
-﻿using System;
+﻿#pragma warning disable CS1591
+using System;
 using System.Net.WebSockets;
 using WampSharp.Core.Listener;
 using WampSharp.V2.Binding;

@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿#pragma warning disable CS1591
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using WampSharp.Core.Message;
 

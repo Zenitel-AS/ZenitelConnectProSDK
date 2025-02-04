@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿#pragma warning disable CS1591
+using System.Reflection;
 using WampSharp.Core.Utilities;
 
 namespace WampSharp.V2.CalleeProxy

@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿#pragma warning disable CS1591
+using System;
 using System.IO;
-using System.Reflection;
 
 namespace LogManager
 {

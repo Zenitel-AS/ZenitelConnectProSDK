@@ -1,4 +1,5 @@
-﻿using WampSharp.Core.Serialization;
+﻿#pragma warning disable CS1591
+using WampSharp.Core.Serialization;
 using WampSharp.V2.Binding.Parsers;
 
 namespace WampSharp.V2.Binding.Contracts

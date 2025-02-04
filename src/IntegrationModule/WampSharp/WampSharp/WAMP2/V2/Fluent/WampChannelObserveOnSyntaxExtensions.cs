@@ -1,4 +1,5 @@
-﻿using System.Reactive.Concurrency;
+﻿#pragma warning disable CS1591
+using System.Reactive.Concurrency;
 
 namespace WampSharp.V2.Fluent
 {

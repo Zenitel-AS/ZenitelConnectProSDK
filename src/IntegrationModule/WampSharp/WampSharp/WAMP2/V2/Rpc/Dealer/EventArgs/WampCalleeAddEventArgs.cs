@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 namespace WampSharp.V2.Rpc
 {
     public class WampCalleeAddEventArgs : WampCalleeChangeEventArgs

@@ -1,4 +1,6 @@
-﻿using System;
+﻿#pragma warning disable CS1591
+
+using System;
 using SuperSocket.ClientEngine;
 using WampSharp.Core.Listener;
 using WampSharp.Core.Message;

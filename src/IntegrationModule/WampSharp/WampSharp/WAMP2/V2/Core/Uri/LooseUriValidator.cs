@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿#pragma warning disable CS1591
+using System.Text.RegularExpressions;
 
 namespace WampSharp.V2.Core
 {

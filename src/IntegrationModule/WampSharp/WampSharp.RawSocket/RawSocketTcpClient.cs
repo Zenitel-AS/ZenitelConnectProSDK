@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using System.IO;
 using System.Net.Sockets;
 

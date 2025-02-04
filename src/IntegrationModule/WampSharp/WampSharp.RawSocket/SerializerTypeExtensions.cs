@@ -1,4 +1,5 @@
-﻿using WampSharp.V2.Binding.Contracts;
+﻿#pragma warning disable CS1591
+using WampSharp.V2.Binding.Contracts;
 
 namespace WampSharp.RawSocket
 {

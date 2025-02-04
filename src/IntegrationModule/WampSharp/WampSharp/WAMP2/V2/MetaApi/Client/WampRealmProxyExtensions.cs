@@ -1,4 +1,5 @@
-﻿using WampSharp.V2.Client;
+﻿#pragma warning disable CS1591
+using WampSharp.V2.Client;
 using WampSharp.V2.Management;
 using WampSharp.V2.Management.Client;
 using WampSharp.V2.Testament.Client;

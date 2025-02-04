@@ -1,3 +1,4 @@
+#pragma warning disable CS1591
 using WampSharp.V2.PubSub;
 
 namespace WampSharp.V2.MetaApi

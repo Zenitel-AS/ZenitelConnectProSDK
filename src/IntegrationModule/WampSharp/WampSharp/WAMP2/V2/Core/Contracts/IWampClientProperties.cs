@@ -1,4 +1,5 @@
-﻿using WampSharp.V2.Authentication;
+﻿#pragma warning disable CS1591
+using WampSharp.V2.Authentication;
 using WampSharp.V2.Binding;
 using WampSharp.V2.MetaApi;
 using WampSharp.V2.Realm.Binded;

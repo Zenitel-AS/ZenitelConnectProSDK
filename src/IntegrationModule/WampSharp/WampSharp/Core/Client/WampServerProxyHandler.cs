@@ -1,4 +1,5 @@
-﻿using WampSharp.Core.Dispatch;
+﻿#pragma warning disable CS1591
+using WampSharp.Core.Dispatch;
 using WampSharp.Core.Listener;
 using WampSharp.Core.Message;
 using WampSharp.Core.Proxy;
