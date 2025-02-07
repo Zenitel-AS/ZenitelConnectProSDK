@@ -23,9 +23,9 @@ The **Zenitel Connect Pro SDK** is a comprehensive toolset for integrating Zenit
 
 ### 2. Getting Started
 - **Build Instructions**:
-  1. Clone the repository or download the package.
-  2. Build the required module for `.NET Framework 4.8`.
-  3. Reference the appropriate DLLs in your project.
+  #. Clone the repository or download the package.
+  #. Build the required module for `.NET Framework 4.8`.
+  #. Reference the appropriate DLLs in your project.
 
 - **Basic Configuration**:
   ```csharp
@@ -41,68 +41,114 @@ The **Zenitel Connect Pro SDK** is a comprehensive toolset for integrating Zenit
   ```
 
 ---
+---
 
 ### 3. Core Components
+
+The **Zenitel Connect Pro SDK** is a comprehensive library built for **.NET Framework 4.8** and **netstandard 2.1**, ensuring compatibility with legacy and modern systems. It is designed as an **SDK-style library** to support robust integration with third-party applications.
+
+---
+
 #### **SharedComponents**
-- Core shared library used across all projects, including:
-  - `Debug` utilities for logging and monitoring.
-  - `Collections` for managing data.
-  - `Events` for event-driven programming.
+
+The **SharedComponents** library is the foundation of the SDK, offering a rich set of tools, utilities, functionalities, and models that are used across all projects. This shared codebase simplifies development by providing reusable components and a consistent structure, making integration and maintenance efficient.
+
+**Key Features**:
+
+1. **Debug Utilities**:  
+   - Provide centralized logging and monitoring capabilities to ensure application behavior is tracked effectively. Utilities like `Debug.Log` and `SystemMonitor` assist in error tracking, system health monitoring, and performance logging.
+
+2. **Collections**:  
+   - Offer a robust framework for managing system entities, including devices, calls, groups, and directory numbers, ensuring seamless data organization and retrieval.
+
+3. **Events**:  
+   - Enable a powerful event-driven programming model that handles notifications, state changes, and UI updates. This simplifies interactions between various SDK components.
+
+4. **Enums**:  
+   - Define constants and system states, ensuring consistency and reducing hard-coded values across the SDK.
+
+5. **Interfaces**:  
+   - Provide abstractions such as `ICamera` to ensure modularity and extensibility within the system.
+
+6. **Models**:  
+   - Represent the core entities of the system, including configurations, devices, calls, and audio events. These models offer a structured approach to data handling, allowing developers to interact with system objects efficiently. Each model is designed to reflect real-world entities with properties and behaviors essential for SDK operations.
+
+7. **Tools**:  
+   - Include various utilities that enhance system reliability and developer productivity:
+     - `AssemblyChecker`: Verifies compatibility between assemblies.
+     - `Cryptography`: Provides secure data handling with encryption tools.
+     - `ErrorLogger`: Offers centralized exception logging with detailed error metadata.
+     - `IconManager`: Handles application icons for consistent UI presentation.
+     - `ObjectConverter`: Simplifies serialization and data conversion.
+     - `ProcessManager`: Manages system-level processes and optimizes resource usage.
+
+---
+---
 
 #### **WampClient**
-- Forked and optimized WAMP library:
-  - `WampClient.NET48`: For .NET Framework 4.8.
+
+The **WampClient** is a critical communication layer built using the **WampSharp** library. It is fully integrated into the SDK to enable real-time messaging and communication between system components.
+
+**Key Features**:
+
+- **Forked and Optimized for Zenitel Connect Pro SDK**:
+  - Custom modifications to suit the SDK's requirements.
+  - Provides enhanced stability and performance for WAMP-based communication.
+
+- **Target Frameworks**:
+  - Designed for both **.NET Framework 4.8** and **netstandard 2.1**, ensuring seamless integration with diverse applications.
+
+- **SharedComponents Integration**:
+  - Works seamlessly with the shared library to handle:
+    - Device communication.
+    - Call events and synchronization.
+    - Audio analytics and event processing.
+    - Broadcasting and access control.
+
+---
 
 #### **Integration Modules**
-- Backend DLLs for `.NET Framework 4.8`.
+
+The **Integration Modules** are backend libraries. These modules implement the shared code and WampClient to provide the following features:
+
+1. **Access Control**:
+   - Securely manage access to restricted areas, including unlocking doors and validating permissions.
+
+2. **Audio Analytics**:
+   - Integrates with third-party audio detection systems to process audio events like gunshots or glass breaking.
+
+3. **Device Management**:
+   - Handles device registration, state updates, and interactions.
+
+4. **Call Management**:
+   - Manages active and queued calls, including prioritization and operator interactions.
+
+5. **Broadcasting**:
+   - Enables broadcasting of audio messages and announcements to groups or devices.
+
+---
+
+### **Key Notes**
+
+- **SDK Architecture**:
+  The entire project is structured as an SDK-style library, making it flexible and extensible for third-party integrations.
+
+- **Target Frameworks**:
+  All components of the SDK, including **SharedComponents**, **WampClient**, and **Integration Modules**, are developed for:
+  - **.NET Framework 4.8**: For compatibility with enterprise and legacy systems.
+  - **netstandard 2.1**: For cross-platform support and modern .NET applications.
+
+- **Comprehensive Shared Code**:
+  The shared library (`SharedComponents`) includes:
+  - Core utilities (e.g., debugging, logging, cryptography).
+  - Interfaces for modular development.
+  - Tools for process management, data conversion, and more.
+
+---
 
 ---
 
 ### 4. Usage Instructions
-
-Here is the expanded README section based on the provided code:
-
----
-
-#### Event Handlers
-The SDK provides robust event handling to track changes and updates in real time. Below are the key event handlers available:
-
-| Event Name                      | Description                                                                 |
-|----------------------------------|-----------------------------------------------------------------------------|
-| `OnActiveVideoFeedChange`       | Fires when a change in the active camera feed is detected.                  |
-| `OnOperatorDirNoChange`         | Occurs when the operator directory number is updated.                       |
-| `OnDeviceListChange`            | Fires when the list of devices is updated.                                  |
-| `OnDeviceStateChange`           | Notifies changes in the state of a specific device.                         |
-| `OnActiveCallListValueChange`   | Fires when the value of the active call list is updated.                    |
-| `OnCallQueueListValueChange`    | Occurs when the queued call list undergoes modifications.                    |
-| `OnDeviceRetrievalStart`        | Signals the start of the device retrieval process.                          |
-| `OnDeviceRetrievalEnd`          | Signals the end of the device retrieval process.                            |
-| `OnLogEntryRequested`           | Fires when a new log entry request is initiated but not yet saved.          |
-| `OnLogEntryAdded`               | Triggered when a log entry is successfully added.                           |
-| `OnDebugChanged`                | Fires when debugging information is modified or added.                      |
-| `OnExceptionThrown`             | Used to handle exceptions and create error log entries.                     |
-| `OnQueuesAndCallsSync`          | Signals the CallHandler to retrieve all active and queued calls.            |
-| `OnConnectionChanged`           | Triggers on changes in connection status with Zenitel Connect.              |
-| `OnConfigurationChanged`        | Fires when configuration data changes.                                      |
-| `CallHandlerPopupRequested`     | Used to open or close a popup window.                                       |
-| `OnManualVideoFeedChange`       | Fires when a manual switch of the camera feed is requested.                 |
-| `OnGroupsListChange`            | Occurs when the list of groups changes.                                     |
-| `OnGroupsMsgUpdate`             | Fires when a group broadcast update is received.                            |
-| `OnDoorOpen`                    | Fires when a door open event is detected.                                   |
-| `OnAudioMessagesChange`         | Fires when an audio message update occurs.                                  |
-
-##### Audio Analytics Events
-The SDK also provides specialized event handlers for audio analytics:
-
-| Event Name                   | Description                                                                  |
-|------------------------------|------------------------------------------------------------------------------|
-| `DataReceived`               | Fires when the Audio Event Detector receives data.                           |
-| `Heartbeat`                  | Occurs when the Audio Event Detector sends a heartbeat signal every minute.  |
-| `AudioEventDetected`         | Fires when an audio event is detected (e.g., gunshot, aggression, glass break). |
-
-These event handlers allow developers to seamlessly integrate real-time monitoring, logging, and interaction functionalities within the system.
-
-Here is the expanded README section incorporating the `Collections` class:
 
 ---
 
@@ -161,9 +207,12 @@ The SDK provides structured collections to manage various elements within Zenite
 Each collection is lazily initialized to optimize memory usage, ensuring that objects are only created when accessed.
 These collections facilitate quick retrieval and management of devices, calls, and messages, allowing seamless integration within the Zenitel Connect ecosystem.
 
-Here are the **tables for each model** with their properties and methods, ensuring nothing is skipped:
+---
 
 ---
+
+#### Models
+Here are the **tables for each model** with their properties and methods, ensuring nothing is skipped:
 
 ### **AudioEventDetected**
 
