@@ -1,4 +1,4 @@
-### Zenitel Connect Pro SDK
+﻿### Zenitel Connect Pro SDK
 
 ---
 
@@ -21,29 +21,7 @@ The **Zenitel Connect Pro SDK** is a comprehensive toolset for integrating Zenit
 
 ---
 
-### 2. Getting Started
-- **Build Instructions**:
-  #. Clone the repository or download the package.
-  #. Build the required module for `.NET Framework 4.8`.
-  #. Reference the appropriate DLLs in your project.
-
-- **Basic Configuration**:
-  ```csharp
-  var core = new ConnectPro.Core();
-
-  core.Configuration.ServerAddr = "169.254.1.5";
-  core.Configuration.Port = "8087";
-  core.Configuration.UserName = "admin";
-  core.Configuration.Password = "password";
-
-  core.Start();
-  core.ConnectionHandler?.OpenConnection();
-  ```
-
----
----
-
-### 3. Core Components
+### 2. Core Components
 
 The **Zenitel Connect Pro SDK** is a comprehensive library built for **.NET Framework 4.8** and **netstandard 2.1**, ensuring compatibility with legacy and modern systems. It is designed as an **SDK-style library** to support robust integration with third-party applications.
 
@@ -82,7 +60,6 @@ The **SharedComponents** library is the foundation of the SDK, offering a rich s
      - `ObjectConverter`: Simplifies serialization and data conversion.
      - `ProcessManager`: Manages system-level processes and optimizes resource usage.
 
----
 ---
 
 #### **WampClient**
@@ -146,9 +123,269 @@ The **Integration Modules** are backend libraries. These modules implement the s
 
 ---
 
+### 2. Getting Started
+- **Build Instructions**:
+  1. Clone the repository or download the package.
+  2. Build the required module for `.NET Framework 4.8`.
+  3. Reference the appropriate DLLs in your project.
+
+- **Basic Configuration**:
+  ```csharp
+  var core = new ConnectPro.Core();
+
+  core.Configuration.ServerAddr = "169.254.1.5";
+  core.Configuration.Port = "8087";
+  core.Configuration.UserName = "admin";
+  core.Configuration.Password = "password";
+
+  core.Start();
+  core.ConnectionHandler?.OpenConnection();
+  ```
+
 ---
 
-### 4. Usage Instructions
+### **4. Usage Instructions**  
+
+Before diving into the SDK usage, it's essential to understand the **Core object**, which serves as the **central static entry point** for accessing all major functionalities.
+
+---
+
+### **1. The Core Object – The Static Entry Point**  
+
+The SDK is designed around a **static Core object** (`CoreHandler.Core`), which acts as a **singleton-style entry point** for accessing all major components, including **handlers, collections, events, and configurations**. This eliminates the need for manually instantiating multiple service objects.
+
+#### **Core Components of `CoreHandler.Core`**:
+  - `CoreHandler.Core.Configuration`: Holds global SDK settings.
+  - `CoreHandler.Core.ConnectionHandler`: Manages WAMP connections.
+  - `CoreHandler.Core.Events`: Handles all SDK-wide events.
+  - `CoreHandler.Core.CallHandler`: Manages active and queued calls.
+  - `CoreHandler.Core.DeviceHandler`: Handles device registration and retrieval.
+  - `CoreHandler.Core.AccessControlHandler`: Manages access control operations.
+  - `CoreHandler.Core.BroadcastingHandler`: Controls audio messaging and group broadcasts.
+  - `CoreHandler.Core.Collection`: Provides access to dynamically updated data structures.
+  - `CoreHandler.Core.Log`: Centralized logging and debugging.
+
+Since `CoreHandler.Core` is a **static reference**, all SDK interactions rely on it, ensuring **global availability** throughout the application.
+
+#### **Example Usage of CoreHandler.Core**
+```csharp
+// Accessing the active call list
+var activeCalls = CoreHandler.Core.Collection.ActiveCalls;
+
+// Posting a new call
+CoreHandler.Core.CallHandler.PostCall("1001", "1002", "setup", true);
+
+// Opening a door through Access Control
+CoreHandler.Core.AccessControlHandler.OpenDoor(selectedDevice);
+
+// Checking Connection Status
+bool isConnected = CoreHandler.Core.ConnectionHandler.IsConnected;
+```
+
+This **static architecture** ensures **centralized control**, reducing the need for multiple object instances and providing **optimized performance**.
+
+---
+
+### **2. Operator Directory Number Must Be Set Before Performing Any Actions**
+
+After the connection is **established** and **devices are retrieved**, the **operator's directory number must be set before any action** (such as **placing calls, sending group messages, or using access control**).  
+Failure to set this value will **prevent call initiation** and **other critical operations**.
+
+#### **Setting the Operator's Directory Number**
+```csharp
+CoreHandler.Core.Configuration.OperatorDirNo = "1001";
+```
+
+✅ **Set it only after the connection is established and devices are available**.
+
+🚨 **Do not attempt to place calls or send messages before setting this value**.
+
+---
+
+### **3. Dynamic Data Handling (Collections Are Auto-Updated)**  
+
+The SDK follows an **event-driven architecture**, meaning **all collections are updated automatically** when changes occur in **Zenitel Connect Pro**.  
+
+#### **Device Collection (Auto-Populated)**
+- When a connection is **established**, **all registered devices** are automatically retrieved and **added to the collection**.
+- **No work is required** from the developer to fetch or refresh devices.
+- If a device is **added, removed, renamed, or moved**, the collection updates automatically.
+
+```csharp
+// Retrieve devices (already auto-populated)
+var devices = CoreHandler.Core.Collection.RegisteredDevices;
+```
+
+#### **Applies to All Collections**
+The same **auto-update principle** applies to:
+- **Active Calls**
+- **Queued Calls**
+- **Groups**
+- **Audio Messages**
+- **Directory Numbers**  
+
+Whenever changes occur **inside Zenitel Connect Pro**, the SDK **syncs the updates automatically**.
+
+---
+
+### **4. Exception Handling with `OnExceptionThrown` (Central Logging)**  
+
+The SDK provides a **centralized exception handling mechanism** using `OnExceptionThrown`.  
+- Developers **do not need to manually handle exceptions** inside handlers or event listeners.  
+- Any unexpected errors **automatically trigger** `OnExceptionThrown`, allowing for **custom log handling**.
+
+#### **Example: Implementing a Custom Exception Logger**
+```csharp
+CoreHandler.Core.Events.OnExceptionThrown += (sender, ex) =>
+{
+    Debug.Log($"Error: {ex.Message}");
+    MessageBox.Show("An error occurred: " + ex.Message);
+};
+```
+
+This approach ensures **centralized exception logging** without modifying individual components.
+
+---
+
+### **5. Core Functionalities & How to Use Them**  
+
+The SDK provides modular components that allow developers to interact with **devices, calls, audio analytics, access control, and event-driven programming**.
+
+---
+
+### **A. Device Management**  
+
+#### **Retrieve Registered Devices**
+```csharp
+// Devices are automatically populated when connected to Zenitel Connect Pro.
+var devices = CoreHandler.Core.Collection.RegisteredDevices;
+```
+
+#### **Call a Selected Device**
+```csharp
+Task.Run(async () =>
+    await CoreHandler.Core.CallHandler.PostCall(
+        CoreHandler.Core.Configuration.OperatorDirNo,
+        selectedDevice.dirno,
+        "setup"
+    )
+);
+```
+
+#### **Perform a Tone Test on a Device**
+```csharp
+CoreHandler.Core.DeviceHandler.InitiateToneTest(selectedDevice.dirno, "3");
+```
+
+---
+
+### **B. Call Handling**  
+
+#### **Initiate a Call**
+```csharp
+CoreHandler.Core.CallHandler.PostCall("1001", "1002", "setup", true);
+```
+
+#### **Listen for Active Call Changes**
+```csharp
+CoreHandler.Core.Events.OnActiveCallListValueChange += HandleActiveCallListChange;
+```
+
+#### **End an Active Call**
+```csharp
+CoreHandler.Core.CallHandler.DeleteCall(device.dirno);
+```
+
+#### **Answer a Queued Call**
+```csharp
+Task.Run(async () => await CoreHandler.Core.CallHandler.AnswerQueuedCall(queuedCall));
+```
+
+---
+
+### **C. Audio Analytics**  
+
+#### **Process Audio Events**
+```csharp
+CoreHandler.Core.Events.AudioAnalytics.AudioEventDetected += HandleAudioEventDetection;
+```
+
+```csharp
+public void HandleAudioEventDetection(object sender, AudioEventDetected audioEvent)
+{
+    Console.WriteLine($"Audio event detected: {audioEvent.EventType} at {audioEvent.Time}");
+}
+```
+
+---
+
+### **D. Broadcasting Messages**  
+
+#### **Retrieve Groups and Audio Messages**
+```csharp
+Task.Run(async () =>
+{
+    await CoreHandler.Core.BroadcastingHandler.RetrieveGroups();
+    await CoreHandler.Core.BroadcastingHandler.RetrieveAudioMessages();
+});
+```
+
+#### **Play an Audio Message**
+```csharp
+CoreHandler.Core.BroadcastingHandler.PlayAudioMessage(audioMessage, targetGroup);
+```
+
+#### **Stop an Audio Message**
+```csharp
+CoreHandler.Core.BroadcastingHandler.StopAudioMessage(audioMessage);
+```
+
+---
+
+### **E. Access Control Management**  
+
+#### **Open a Door for a Device**
+```csharp
+CoreHandler.Core.AccessControlHandler.OpenDoor(selectedDevice);
+```
+
+---
+
+### **F. Event Handling in the SDK**  
+
+The SDK provides a robust **event-driven architecture**, allowing UI and logic components to react dynamically.
+
+#### **Listening to Device List Changes**
+```csharp
+CoreHandler.Core.Events.OnDeviceListChange += HandleDeviceListChange;
+```
+
+#### **Listening to Operator Directory Number Changes**
+```csharp
+CoreHandler.Core.Events.OnOperatorDirNoChange += HandleOperatorDirnoChange;
+```
+
+#### **Listening to Connection Changes**
+```csharp
+CoreHandler.Core.Events.OnConnectionChanged += HandleConnectionChange_Client;
+```
+
+---
+
+### **6. Summary**
+The **Zenitel Connect Pro SDK** provides a **modular, event-driven, and centralized framework** for managing:
+- **Devices** (Automatically Populated)
+- **Calls (Active & Queued)**
+- **Audio analytics**
+- **Broadcasting**
+- **Access control**
+- **Real-time event handling**
+- **Seamless UI integration**
+
+### **Important Notes**:
+✅ **Collections are auto-populated**; no manual fetching is required.  
+✅ **Set `OperatorDirNo` after connection & device retrieval, before placing calls or sending messages**.  
+✅ **Use `OnExceptionThrown` for centralized error handling**.  
 
 ---
 
@@ -437,7 +674,7 @@ Here are the **tables for each model** with their properties and methods, ensuri
 
 ---
 
-Here�s the enhanced **Handlers** description with method return types included:
+Here’s the enhanced **Handlers** description with method return types included:
 
 ---
 
