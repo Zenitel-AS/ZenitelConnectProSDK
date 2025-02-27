@@ -11,12 +11,6 @@ namespace ConnectPro.Models
         #region Properties
 
         /// <summary>
-        /// Gets or sets the unique identifier for the device-camera association.
-        /// </summary>
-        [Key]
-        public int Id { get; set; }
-
-        /// <summary>
         /// Gets or sets the unique identifier of the associated device.
         /// </summary>
         public int DeviceId { get; set; }

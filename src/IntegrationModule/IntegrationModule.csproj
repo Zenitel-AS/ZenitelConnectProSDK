@@ -22,6 +22,16 @@
 		<Description>A comprehensive SDK for integrating Zenitel Connect Pro with third-party systems. It provides tools for managing intercom, PA systems, and event-driven workflows, ensuring seamless communication and integration.</Description>
 	</PropertyGroup>
 
+	<PropertyGroup>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+
+	<PropertyGroup>
+  		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+	</PropertyGroup>
+
+
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
 		<DebugType>full</DebugType>
 		<Optimize>false</Optimize>
