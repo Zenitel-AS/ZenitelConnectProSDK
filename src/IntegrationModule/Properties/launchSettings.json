@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IntegrationModule": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

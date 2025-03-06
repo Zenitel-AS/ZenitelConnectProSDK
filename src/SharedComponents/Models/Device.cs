@@ -15,6 +15,16 @@ namespace ConnectPro.Models
     [Serializable]
     public class Device
     {
+        #region Fields
+        /// <summary>
+        /// The current call state of the device.
+        /// </summary>
+        public CallState? _callState = null;
+        /// <summary>
+        /// The previous call state of the device.
+        /// </summary>
+        public CallState? _previousCallState = null;
+        #endregion
         #region Properties
 
         /// <summary>
@@ -57,7 +67,19 @@ namespace ConnectPro.Models
         /// <summary>
         /// Gets or sets the current call state of the device.
         /// </summary>
-        public CallState? CallState { get; set; } = null;
+        public CallState? CallState
+        {
+            get { return _callState; }
+            set
+            {
+                _callState = value;
+                if(_previousCallState != _callState)
+                {
+                    _previousCallState = _callState;
+                    OnCallStateChange?.Invoke(this, _callState.Value);
+                }
+            }
+        }
 
         /// <summary>
         /// Gets or sets the username used for authentication.
@@ -173,6 +195,13 @@ namespace ConnectPro.Models
             return device;
         }
 
+        #endregion
+
+        #region Events
+        /// <summary>
+        /// Occurs when the call state of the device changes.
+        /// </summary>
+        public EventHandler<CallState> OnCallStateChange { get; set; }
         #endregion
     }
 }
