@@ -22,6 +22,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Handlers\DatabaseHandler.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Handlers\DeviceHandler.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\ICamera.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\AccessControl\OpenDoorEventData.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\AudioAnalytics\AudioEventDetected.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\AudioAnalytics\DataReceived.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\AudioAnalytics\Heartbeat.cs" />

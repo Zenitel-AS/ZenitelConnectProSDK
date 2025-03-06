@@ -1,0 +1,17 @@
+﻿<UserControl x:Class="CoreHandlerDesktop.UC.IO"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="100" d:DesignWidth="200">
+    <Grid>
+        <StackPanel>
+            <TextBlock Text="{Binding name}" FontWeight="Bold" />
+            <TextBlock x:Name="txtIO" Text="Waiting for event..." />
+            <Button x:Name="btnOpenDoor" Content="Open Door" Click="OpenDoor_Click" />
+            <Button x:Name="btnStartCall" Content="Start Call" Click="btnStartCall_Click" />
+            <Button x:Name="btnDropCall" Content="Drop Call" Click="btnDropCall_Click" />
+        </StackPanel>
+    </Grid>
+</UserControl>

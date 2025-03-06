@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationModule", "src\In
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "SharedComponents", "src\SharedComponents\SharedComponents.shproj", "{7AFF2EE5-CBAE-46DF-B12B-BF9F8E0054E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreHandlerDesktop", "CoreHandlerDesktop\CoreHandlerDesktop.csproj", "{4430B434-C28C-4162-B737-132FF52E79ED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,6 +31,14 @@ Global
 		{11F6E3C3-4D69-4993-8D7D-AB1C277438E1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{11F6E3C3-4D69-4993-8D7D-AB1C277438E1}.Release|x86.ActiveCfg = Release|Any CPU
 		{11F6E3C3-4D69-4993-8D7D-AB1C277438E1}.Release|x86.Build.0 = Release|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Debug|x86.Build.0 = Debug|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Release|x86.ActiveCfg = Release|Any CPU
+		{4430B434-C28C-4162-B737-132FF52E79ED}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
