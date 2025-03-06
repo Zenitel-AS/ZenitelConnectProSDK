@@ -7,11 +7,12 @@ namespace ConnectPro
     /// <summary>
     /// Monitors system events, handles exceptions, and logs WAMP client messages.
     /// </summary>
-    public class SystemMonitor
+    public class SystemMonitor : IDisposable
     {
         #region Fields
 
         private readonly object _lock = new object();
+        private readonly WampClient _wamp;
         private readonly Events _events;
         private readonly Configuration _configuration;
         private Tools.ErrorLogger _errorLogger;
@@ -38,18 +39,18 @@ namespace ConnectPro
         /// <param name="events">The event system used for exception handling.</param>
         /// <param name="configuration">The application configuration containing log file paths.</param>
         /// <param name="_wamp">The WAMP client used for handling log messages.</param>
-        public SystemMonitor(Events events, Configuration configuration, ref WampClient _wamp)
+        public SystemMonitor(Events events, Configuration configuration, ref WampClient wamp)
         {
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _events.OnExceptionThrown += HandleExceptionThrown;
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _wamp = wamp ?? throw new ArgumentNullException(nameof(wamp));
 
             if (_wamp != null)
             {
                 _wamp.OnChildLogString += HandleWampChildLogString;
             }
         }
-
         #endregion
 
         #region Event Handlers
@@ -90,6 +91,46 @@ namespace ConnectPro
             }
         }
 
+        #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Unsubscribe from events
+                if (_events != null)
+                {
+                    _events.OnExceptionThrown -= HandleExceptionThrown;
+                }
+
+                // If WAMP client subscription exists, unsubscribe
+                if (_wamp != null)
+                {
+                    _wamp.OnChildLogString -= HandleWampChildLogString;
+                }
+
+                // Dispose managed resources explicitly if any
+                if (_errorLogger != null)
+                {
+                    _errorLogger.Dispose();
+                    _errorLogger = null;
+                }
+            }
+
+            _disposed = true;
+        }
         #endregion
     }
 }

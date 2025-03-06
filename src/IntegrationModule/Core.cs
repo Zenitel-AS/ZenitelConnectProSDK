@@ -7,7 +7,7 @@ namespace ConnectPro
     /// <summary>
     /// Represents the core of the application, managing configurations, event handling, and system components.
     /// </summary>
-    public class Core
+    public class Core : IDisposable
     {
         #region Fields
 
@@ -19,6 +19,12 @@ namespace ConnectPro
         #endregion
 
         #region Properties
+
+        private bool _isRuning = false;
+        /// <summary>
+        /// Indicates whether the core handlers are running.
+        /// </summary>
+        public bool IsRunning => _isRuning;
 
         /// <summary>
         /// Gets or sets the application configuration.
@@ -127,7 +133,7 @@ namespace ConnectPro
         /// <summary>
         /// Starts the core components of the application.
         /// </summary>
-        public void Start()
+        public bool Start()
         {
             /*
              * Load order is important!
@@ -148,9 +154,12 @@ namespace ConnectPro
             // DatabaseHandler = new DatabaseHandler(Collection, Events);
             CallHandler = new CallHandler(ref _collection, ref _events, ref _wamp, ref _configuration, Configuration.ServerAddr);
             ConnectionHandler = new ConnectionHandler(ref _events, ref _wamp, ref _configuration, Configuration.ServerAddr);
-            AccessControlHandler = new AccessControlHandler(ref _events, ref _wamp, Configuration.ServerAddr);
+            AccessControlHandler = new AccessControlHandler(ref _events, ref _wamp, ref _configuration);
             BroadcastingHandler = new BroadcastingHandler(ref _collection, ref _events, ref _wamp, Configuration.ServerAddr);
             Log = new Debug.Log(Collection, Events);
+
+            _isRuning = true;
+            return true;
         }
 
         /// <summary>
@@ -172,7 +181,60 @@ namespace ConnectPro
                 Events.OnExceptionThrown?.Invoke(this, exe);
             }
         }
+        #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Unsubscribe from events
+                if (_events != null)
+                {
+                    _events.OnConnectionChanged -= HandleConnectionChanged;
+                }
+
+                // Dispose managed resources
+                SystemMonitor?.Dispose();
+                DeviceHandler?.Dispose();
+                AudioEventHandler?.Dispose();
+                CallHandler?.Dispose();
+                AccessControlHandler?.Dispose();
+                BroadcastingHandler?.Dispose();
+                Log?.Dispose();
+                ConnectionHandler?.Dispose();
+
+                // Ensure fields are cleared to release references
+                SystemMonitor = null;
+                DeviceHandler = null;
+                AudioEventHandler = null;
+                CallHandler = null;
+                AccessControlHandler = null;
+                BroadcastingHandler = null;
+                Log = null;
+                ConnectionHandler = null;
+                _wamp = null;
+            }
+
+            _disposed = true;
+        }
 
         #endregion
+
     }
 }

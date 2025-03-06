@@ -22,7 +22,7 @@ namespace ConnectPro.Handlers
     /// interactions with the WAMP client, and synchronization of call data.
     /// </summary>
    
-    public class CallHandler
+    public class CallHandler : IDisposable
     {
         #region Fields & Locks
 
@@ -815,5 +815,46 @@ namespace ConnectPro.Handlers
         }
 
         #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                if (_wamp != null)
+                {
+                    _wamp.OnWampCallStatusEvent -= HandleCallStatusChangedEvent;
+                    _wamp.OnWampCallLegStatusEvent -= HandleCallQueueChange;
+                }
+
+                if (_events != null)
+                {
+                    _events.OnQueuesAndCallsSync -= HandleQueuesAndCallsSync;
+                    _events.OnOperatorDirNoChange -= HandleOperatorDirectoryNumberChange;
+                }
+
+                // Dispose other managed resources here, if added later
+            }
+
+            _disposed = true;
+        }
+
+        #endregion
+
     }
 }

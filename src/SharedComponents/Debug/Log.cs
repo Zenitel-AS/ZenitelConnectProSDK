@@ -11,7 +11,7 @@ namespace ConnectPro.Debug
     /// Handles logging of call events, including call initiation, queued calls, 
     /// and door events. Uses an internal device lookup for efficient access.
     /// </summary>
-    public class Log
+    public class Log : IDisposable
     {
         #region Fields
 
@@ -230,5 +230,48 @@ namespace ConnectPro.Debug
         }
 
         #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                if (_events != null)
+                {
+                    _events.OnDeviceRetrievalEnd -= SetDeviceLookupDictionary;
+                    _events.OnLogEntryRequested -= OnLogEntryRequestedHandler;
+                }
+
+                _deviceLookup.Clear();
+            }
+
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Explicit handler for unsubscribing from lambda event.
+        /// </summary>
+        private async void OnLogEntryRequestedHandler(object sender, object info)
+        {
+            await RecordCallLogAsync(info);
+        }
+
+        #endregion
+
     }
 }

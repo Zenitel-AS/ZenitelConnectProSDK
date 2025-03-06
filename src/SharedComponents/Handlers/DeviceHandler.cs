@@ -15,7 +15,7 @@ namespace ConnectPro.Handlers
     /// and interaction with the WAMP client.
     /// </summary>
     
-    public class DeviceHandler
+    public class DeviceHandler : IDisposable
     {
         #region Fields & Locks
 
@@ -276,5 +276,52 @@ namespace ConnectPro.Handlers
         }
 
         #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Unsubscribe from events
+                if (_events != null)
+                {
+                    _events.OnDeviceRetrievalStart -= HandleDeviceRetrievalStartEvent;
+                    _events.OnDeviceStateChange -= HandleDeviceStateChange;
+                }
+
+                if (_wamp != null)
+                {
+                    _wamp.OnWampDeviceRegistrationEvent -= HandleDeviceRegistration;
+                }
+
+                // Dispose timer
+                if (DeviceRetrievalTimer != null)
+                {
+                    DeviceRetrievalTimer.Stop();
+                    DeviceRetrievalTimer.Dispose();
+                    DeviceRetrievalTimer = null;
+                }
+            }
+
+            _disposed = true;
+        }
+
+        #endregion
+
     }
 }

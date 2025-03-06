@@ -67,6 +67,10 @@ namespace ConnectPro
         /// Occurs when the queued call list undergoes changes.
         /// </summary>
         public EventHandler OnCallQueueListValueChange { get; set; }
+        /// <summary>
+        /// Occurs when a Device <seealso cref="Enums.CallState"/> CallState undergoes changes.
+        /// </summary>
+        public EventHandler<Device> OnDeviceCallStateChange { get; set; }
 
         #endregion
 

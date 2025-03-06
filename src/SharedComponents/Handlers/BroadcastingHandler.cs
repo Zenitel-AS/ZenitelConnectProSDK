@@ -13,7 +13,7 @@ namespace ConnectPro.Handlers
     /// <summary>
     /// Handles broadcasting operations, including retrieving groups and audio messages, and playing or stopping audio messages.
     /// </summary>
-    public class BroadcastingHandler
+    public class BroadcastingHandler : IDisposable
     {
         private Collections _collections;
         private Events _events;
@@ -227,5 +227,46 @@ namespace ConnectPro.Handlers
                 await Task.Delay(duration, cancellationToken);
             }
         }
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Unsubscribe from events
+                if (_events != null)
+                {
+                    _events.OnConnectionChanged -= HandleConnectionChange;
+                }
+
+                // Dispose CancellationTokenSource
+                if (_playbackCancellationTokenSource != null)
+                {
+                    _playbackCancellationTokenSource.Cancel();
+                    _playbackCancellationTokenSource.Dispose();
+                    _playbackCancellationTokenSource = null;
+                }
+            }
+
+            _disposed = true;
+        }
+
+        #endregion
+
     }
 }

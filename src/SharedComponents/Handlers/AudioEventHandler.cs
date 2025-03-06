@@ -10,7 +10,7 @@ namespace ConnectPro.Handlers
     /// <summary>
     /// Handles audio events from the WAMP client, including detection, data receiving, and detector alive signals.
     /// </summary>
-    public class AudioEventHandler
+    public class AudioEventHandler : IDisposable
     {
         #region Fields
 
@@ -92,5 +92,40 @@ namespace ConnectPro.Handlers
         }
 
         #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Unsubscribe from WAMP client events
+                if (_wamp != null)
+                {
+                    _wamp.OnAudioEventDetection -= HandleAudioEventDetection;
+                    _wamp.OnAudioDataReceiving -= HandleAudioDataReceivingEvent;
+                    _wamp.OnAudioDetectorAlive -= HandleAudioDetectorAliveEvent;
+                }
+            }
+
+            _disposed = true;
+        }
+
+        #endregion
+
     }
 }

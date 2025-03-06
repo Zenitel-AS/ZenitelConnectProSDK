@@ -11,7 +11,7 @@ namespace ConnectPro
     /// and listens for configuration changes.
     /// </summary>
     
-    public class ConnectionHandler
+    public class ConnectionHandler : IDisposable
     {
         #region Fields & Locks
 
@@ -109,6 +109,7 @@ namespace ConnectPro
                         _wamp.TraceAudioEventDetection();
                         _wamp.TraceAudioDataReceiving();
                         _wamp.TraceAudioDetectorAlive();
+                        _wamp.TraceOpenDoorEvent();
 
                         this.ResetRecconectionCounter();
                         break;
@@ -179,7 +180,48 @@ namespace ConnectPro
         {
             _maxReconnect = 10;
         }
-        
+
         #endregion
+
+        #region IDisposable Implementation
+
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        public void Dispose()
+        {
+            _wamp.Stop();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Unsubscribe from events
+                if (_wamp != null)
+                {
+                    _wamp.OnConnectChanged -= HandleConnectionChangeEvent_Internal;
+                }
+
+                if (_events != null)
+                {
+                    _events.OnConfigurationChanged -= HandleConfigurationChangeEvent;
+                }
+
+                // If you have timers or additional managed resources added later, dispose them here.
+            }
+
+            _disposed = true;
+        }
+
+        #endregion
+
     }
 }
