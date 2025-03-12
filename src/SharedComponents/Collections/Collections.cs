@@ -14,6 +14,7 @@ namespace ConnectPro
         private List<Device> _registeredDevices;
         private List<Device> _activeCalls;
         private List<CallLegElement> _callQueue;
+        private List<CallElement> _callList;
         private List<Group> _groups;
         private List<AudioMessage> _audioMessages;
         private List<DirectoryNumber> _directoryNumbers;
@@ -78,6 +79,22 @@ namespace ConnectPro
                 return _callQueue;
             }
             set { _callQueue = value; }
+        }
+        /// <summary>
+        /// Gets or sets the collection of all calls.
+        /// </summary>
+
+        public List<CallElement> CallList
+        {
+            get
+            {
+                if (_callList == null)
+                {
+                    _callList = new List<CallElement>();
+                }
+                return _callList;
+            }
+            set { _callList = value; }
         }
 
         /// <summary>

@@ -201,6 +201,7 @@ namespace ConnectPro.Models
         /// <summary>
         /// Occurs when the call state of the device changes.
         /// </summary>
+        [NotMapped]
         public EventHandler<CallState> OnCallStateChange { get; set; }
         #endregion
     }

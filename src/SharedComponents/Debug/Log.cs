@@ -43,7 +43,7 @@ namespace ConnectPro.Debug
 
             // Initialize the device lookup for faster access
             _events.OnDeviceRetrievalEnd += SetDeviceLookupDictionary;
-            _events.OnLogEntryRequested += async (sender, info) => await RecordCallLogAsync(info);
+            _events.OnCallLogEntryRequested += async (sender, info) => await RecordCallLogAsync(info);
         }
 
         #endregion
@@ -100,7 +100,7 @@ namespace ConnectPro.Debug
 
                 CallLog logEntry = CreateLogEntry(call_info);
 
-                await Task.Run(() => _events.OnLogEntryAdded?.Invoke(this, logEntry));
+                await Task.Run(() => _events.OnCallLogEntryAdded?.Invoke(this, logEntry));
             }
             catch (Exception ex)
             {
@@ -194,7 +194,7 @@ namespace ConnectPro.Debug
                     Location = from.location
                 };
 
-                await Task.Run(() => _events.OnLogEntryAdded?.Invoke(this, logEntry));
+                await Task.Run(() => _events.OnCallLogEntryAdded?.Invoke(this, logEntry));
             }
             catch (Exception ex)
             {
@@ -254,7 +254,7 @@ namespace ConnectPro.Debug
                 if (_events != null)
                 {
                     _events.OnDeviceRetrievalEnd -= SetDeviceLookupDictionary;
-                    _events.OnLogEntryRequested -= OnLogEntryRequestedHandler;
+                    _events.OnCallLogEntryRequested -= OnLogEntryRequestedHandler;
                 }
 
                 _deviceLookup.Clear();

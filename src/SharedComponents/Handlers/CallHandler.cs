@@ -191,7 +191,9 @@ namespace ConnectPro.Handlers
         private void HandleCallStatusChangedEvent(object sender, WampClient.wamp_call_element call_Element)
         {
             CallElement callElement = new CallElement(call_Element);
-            _events.OnLogEntryRequested?.Invoke(this, callElement);
+            callElement.StartTime = DateTime.UtcNow;
+            _events.OnCallLogEntryRequested?.Invoke(this, callElement);
+            _events.OnCallEvent?.Invoke(this, callElement);
 
             if (this.IsHandlingCallStatusChange == false)
             {
@@ -261,7 +263,7 @@ namespace ConnectPro.Handlers
         {
             try
             {
-                _events.OnLogEntryRequested?.Invoke(this, callQueueElement);
+                _events.OnCallLogEntryRequested?.Invoke(this, callQueueElement);
 
                 switch (callQueueElement.state)
                 {
@@ -714,7 +716,7 @@ namespace ConnectPro.Handlers
                             if (activeCall != null)
                             {
                                 Task.Run(() => _wamp.DeleteCallId(activeCall.call_id));
-                                _events.OnLogEntryRequested?.Invoke(this, activeCall);
+                                _events.OnCallLogEntryRequested?.Invoke(this, activeCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
                             }
                         }
@@ -725,7 +727,7 @@ namespace ConnectPro.Handlers
                             if (queuedCall != null)
                             {
                                 Task.Run(() => _wamp.DeleteCallId(queuedCall.call_id));
-                                _events.OnLogEntryRequested?.Invoke(this, queuedCall);
+                                _events.OnCallLogEntryRequested?.Invoke(this, queuedCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
                             }
                         }
@@ -757,7 +759,7 @@ namespace ConnectPro.Handlers
                         {
                             if (calls.Count > 0)
                             {
-                                _events.OnLogEntryRequested?.Invoke(this, calls.First());
+                                _events.OnCallLogEntryRequested?.Invoke(this, calls.First());
                             }
                         }
                         _wamp.DeleteCallId(callId.ToString());

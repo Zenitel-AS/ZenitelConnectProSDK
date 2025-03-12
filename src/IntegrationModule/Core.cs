@@ -148,7 +148,7 @@ namespace ConnectPro
              * 
              */
 
-            SystemMonitor = new SystemMonitor(Events, Configuration);
+            SystemMonitor = new SystemMonitor(Events, Configuration, ref _wamp);
             DeviceHandler = new DeviceHandler(ref _collection, ref _events, ref _wamp, Configuration.ServerAddr);
             AudioEventHandler = new AudioEventHandler(ref _events, ref _wamp, Configuration.ServerAddr);
             // DatabaseHandler = new DatabaseHandler(Collection, Events);

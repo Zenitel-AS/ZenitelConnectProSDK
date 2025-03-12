@@ -59,6 +59,15 @@ namespace ConnectPro
         public EventHandler<CallElement> OnDeviceStateChange { get; set; }
 
         /// <summary>
+        /// Occurs when a Device <seealso cref="Enums.CallState"/> CallState undergoes changes.
+        /// </summary>
+        public EventHandler<Device> OnDeviceCallStateChange { get; set; }
+
+        #endregion
+
+        #region Call Events
+
+        /// <summary>
         /// Occurs when the value of the active call list changes.
         /// </summary>
         public EventHandler OnActiveCallListValueChange { get; set; }
@@ -67,10 +76,11 @@ namespace ConnectPro
         /// Occurs when the queued call list undergoes changes.
         /// </summary>
         public EventHandler OnCallQueueListValueChange { get; set; }
+
         /// <summary>
-        /// Occurs when a Device <seealso cref="Enums.CallState"/> CallState undergoes changes.
+        /// Occurs when a call manipulation has been reported from wamp.
         /// </summary>
-        public EventHandler<Device> OnDeviceCallStateChange { get; set; }
+        public EventHandler<CallElement> OnCallEvent { get; set; }
 
         #endregion
 
@@ -84,12 +94,16 @@ namespace ConnectPro
         /// <summary>
         /// Signals the initiation of building a log entry, not yet saved.
         /// </summary>
-        public EventHandler<object> OnLogEntryRequested { get; set; }
+        public EventHandler<object> OnCallLogEntryRequested { get; set; }
 
         /// <summary>
         /// Occurs after a log entry has been successfully added.
         /// </summary>
-        public EventHandler<CallLog> OnLogEntryAdded { get; set; }
+        public EventHandler<CallLog> OnCallLogEntryAdded{ get; set; }
+        /// <summary>
+        /// Occurs when a child log entry is added in WAMP.
+        /// </summary>
+        public EventHandler<string> OnChildLogEntry { get; set; }
 
         #endregion
 

@@ -78,15 +78,16 @@ namespace ConnectPro
         /// </summary>
         /// <param name="sender">The source of the log message.</param>
         /// <param name="ex">The log message string.</param>
-        private void HandleWampChildLogString(object sender, string ex)
+        private void HandleWampChildLogString(object sender, string message)
         {
-            if (string.IsNullOrEmpty(ex)) return;
+            if (string.IsNullOrEmpty(message)) return;
 
             lock (_lock)
             {
                 using (_errorLogger = new Tools.ErrorLogger(_configuration.ErrorLogFilePath))
                 {
-                    Task.Run(async () => await _errorLogger.LogMessage(Tools.ErrorLogger.LogLevel.Warning, ex));
+                    Task.Run(async () => await _errorLogger.LogMessage(Tools.ErrorLogger.LogLevel.Warning, message));
+                    _events.OnChildLogEntry?.Invoke(this, message);
                 }
             }
         }
