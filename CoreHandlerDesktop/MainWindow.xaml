@@ -36,7 +36,9 @@
                                  Height="50" Width="200" 
                                  Margin="10"/>
             <Button x:Name="btnConfig" Content="Configuration" Width="100" Margin="10" Click="btnConfig_Click"/>
-            <Button x:Name="btnStateWindow" Content="StateTracker" Width="100" Margin="10" Click="btnStateWindow_Click"/>
+            <Button x:Name="btnStateWindow" Content="State Tracker" Width="100" Margin="10" Click="btnStateWindow_Click"/>
+            <Button x:Name="btnCallTrackerWindow" Content="Call Tracker" Width="100" Margin="10" Click="btnCallTrackerWindow_Click"/>
+            <Button x:Name="btnLogsWindow" Content="Log" Width="100" Margin="10" Click="btnLogsWindow_Click"/>
         </StackPanel>
 
         <!-- Groups (Left Panel) -->

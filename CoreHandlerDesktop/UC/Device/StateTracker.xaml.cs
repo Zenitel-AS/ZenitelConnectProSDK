@@ -78,11 +78,5 @@ namespace CoreHandlerDesktop.UC.Device
         private void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-        // ✅ Override Close button to hide instead of closing
-        protected override void OnClosing(CancelEventArgs e)
-        {
-            e.Cancel = true;
-            this.Hide();
-        }
     }
 }

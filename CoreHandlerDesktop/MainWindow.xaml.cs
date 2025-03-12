@@ -1,4 +1,5 @@
 ﻿using CoreHandlerDesktop.UC;
+using CoreHandlerDesktop.UC.Calls;
 using CoreHandlerDesktop.UC.Device;
 using System;
 using System.Collections.Generic;
@@ -84,5 +85,20 @@ namespace CoreHandlerDesktop
             Application.Current.Shutdown();
         }
 
+        private void btnCallTrackerWindow_Click(object sender, RoutedEventArgs e)
+        {
+            new CallTracker()
+            {
+                Topmost = true
+            }.Show();
+        }
+
+        private void btnLogsWindow_Click(object sender, RoutedEventArgs e)
+        {
+            new LogsWindow()
+            {
+                Topmost = true
+            }.Show();
+        }
     }
 }
