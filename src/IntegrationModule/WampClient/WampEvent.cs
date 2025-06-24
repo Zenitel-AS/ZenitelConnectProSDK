@@ -534,5 +534,62 @@ namespace Wamp.Client
             public string UCT_time { get; set; }
         }
 
+        /// <summary>
+        /// Represents the extended status of a WAMP device, including test results for tone and button tests.
+        /// </summary>
+        public class wamp_device_extended_status
+        {
+            /// <summary>
+            /// The current status of the test.
+            /// Possible values: "passed", "failed", or other status indicators.
+            /// </summary>
+            public string current_status { get; set; }
+
+            /// <summary>
+            /// The unique identifier of the device.
+            /// </summary>
+            public int device_id { get; set; }
+
+            /// <summary>
+            /// The directory number of the device.
+            /// </summary>
+            public string dirno { get; set; }
+
+            /// <summary>
+            /// A message detailing test results.
+            /// Contains diagnostic information such as silence and tone levels.
+            /// </summary>
+            public string error_message { get; set; }
+
+            /// <summary>
+            /// The timestamp of the last failed test in ISO 8601 format (UTC).
+            /// Example: "2024-10-29T15:12:30.710373+00:00"
+            /// </summary>
+            public string last_fail { get; set; }
+
+            /// <summary>
+            /// The timestamp of the last successful test in ISO 8601 format (UTC).
+            /// Example: "2024-10-29T15:12:23.70557+00:00"
+            /// </summary>
+            public string last_pass { get; set; }
+
+            /// <summary>
+            /// The timestamp when the test was last queued in ISO 8601 format (UTC).
+            /// Example: "2024-10-29T15:12:22.062465+00:00"
+            /// </summary>
+            public string last_queued { get; set; }
+
+            /// <summary>
+            /// Indicates whether there is a pending test.
+            /// Possible values: "true" or "false".
+            /// </summary>
+            public string pending_test { get; set; }
+
+            /// <summary>
+            /// The type of test being performed.
+            /// Example: "tonetest".
+            /// </summary>
+            public string status_type { get; set; }
+        }
     }
 }

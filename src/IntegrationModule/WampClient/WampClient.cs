@@ -145,6 +145,9 @@ namespace Wamp.Client
         /// <summary>Dialing digit 6 in conversation will trigger an open door event.</summary>
         public const string TraceWampSystemOpenDoor = "com.zenitel.system.open_door";
 
+        /// <summary>Subscribe to WAMP to publish est results for tone and button tests. This is only used for documenting wamp subscribe, HTTP GET to this URL does nothing.</summary>
+        public const string TraceDeviceExtendedStatus = "com.zenitel.system.device.extended_status";
+
         /// <summary>Send dialling digit from station.</summary>
         public const string PostWampDevicesDeviceIdKey = "com.zenitel.devices.device.key.post";
 
