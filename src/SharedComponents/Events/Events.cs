@@ -119,6 +119,11 @@ namespace ConnectPro
         /// </summary>
         public EventHandler OnDeviceRetrievalEnd { get; set; }
 
+        /// <summary>
+        /// Signals the result of the device test procedure (tone or button).
+        /// </summary>
+        public EventHandler<ExtendedStatus> OnDeviceTest { get; set; }
+
         #endregion
 
         #region System & Configuration Events

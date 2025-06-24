@@ -74,6 +74,7 @@ namespace ConnectPro.Handlers
             ParentIpAddress = parentIpAddress;
 
             _wamp.OnWampDeviceRegistrationEvent += HandleDeviceRegistration;
+            _wamp.OnWampDeviceExtendedStatusEvent += HandleDeviceExtendedStatus;
             _events.OnDeviceRetrievalStart += HandleDeviceRetrievalStartEvent;
             _events.OnDeviceStateChange += HandleDeviceStateChange;
         }
@@ -159,6 +160,15 @@ namespace ConnectPro.Handlers
             }
         }
 
+        private void HandleDeviceExtendedStatus(object sender, WampClient.wamp_device_extended_status ele)
+        {
+            ExtendedStatus deviceStatus = new ExtendedStatus(ele);
+            if (deviceStatus != null)
+            {
+                _events.OnDeviceTest?.Invoke(this, deviceStatus);
+            }
+        }
+
         #endregion
 
         #region Device Retrieval & Management
@@ -166,7 +176,7 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Retrieves the list of registered devices from the WAMP client and updates the collections.
         /// </summary>
-        
+
         public async Task RetrieveRegisteredDevices()
         {
             await Task.Run(() =>
@@ -289,7 +299,10 @@ namespace ConnectPro.Handlers
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)
