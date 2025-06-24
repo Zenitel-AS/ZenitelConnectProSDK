@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
 	<metadata>
 		<id>Zenitel.ConnectPro.SDK</id>
-		<version>1.0.2</version>
+		<version>1.0.5</version>
 		<authors>Zenitel</authors>
 		<owners>Zenitel</owners>
 		<requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -26,7 +26,7 @@
 	</metadata>
 	<files>
 		<file src="icon.png" target="." />
-		<file src="readme.md" target="." />
+		<file src="README.md" target="." />
 		<!-- Files for .NET Framework 4.8 -->
 		<file src="bin\Release\net48\Zenitel.ConnectPro.SDK.dll" target="lib\net48" />
 		<file src="bin\Release\net48\Zenitel.ConnectPro.SDK.pdb" target="lib\net48" />
