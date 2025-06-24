@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -71,11 +72,9 @@ namespace ConnectPro.Tools
                     {
                         lock (lockObject)
                         {
-                            using (FileStream fileStream = new FileStream(
-                                _logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-                            {
-                                return new StreamWriter(fileStream);
-                            }
+                            FileStream fileStream = new FileStream(
+                                _logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                            return new StreamWriter(fileStream);
                         }
                     }
                     catch (IOException ex)
@@ -129,9 +128,35 @@ namespace ConnectPro.Tools
         {
             lock (lockObject)
             {
-                return logFileWriterLazy.Value.BaseStream.Length + logEntry.Length < maxLogFileSizeBytes;
+                try
+                {
+                    if (!logFileWriterLazy.IsValueCreated)
+                    {
+                        try
+                        {
+                            var _ = logFileWriterLazy.Value;
+                        }
+                        catch (Exception ex)
+                        {
+                            HandleLoggingException(ex);
+                            return false;
+                        }
+                    }
+
+                    if (logFileWriterLazy.Value?.BaseStream == null)
+                        return false;
+
+                    var encoding = logFileWriterLazy.Value.Encoding ?? Encoding.UTF8;
+                    return logFileWriterLazy.Value.BaseStream.Length + encoding.GetByteCount(logEntry) < maxLogFileSizeBytes;
+                }
+                catch (Exception ex)
+                {
+                    HandleLoggingException(ex);
+                    return false;
+                }
             }
         }
+
 
         /// <summary>
         /// Asynchronously writes a log entry to the log file.
