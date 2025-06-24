@@ -716,6 +716,7 @@ namespace ConnectPro.Handlers
                             if (activeCall != null)
                             {
                                 Task.Run(() => _wamp.DeleteCallId(activeCall.call_id));
+                                Task.Run(() => _wamp.DeleteCalls(dirno)); //falback
                                 _events.OnCallLogEntryRequested?.Invoke(this, activeCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
                             }
@@ -727,6 +728,7 @@ namespace ConnectPro.Handlers
                             if (queuedCall != null)
                             {
                                 Task.Run(() => _wamp.DeleteCallId(queuedCall.call_id));
+                                Task.Run(() => _wamp.DeleteCalls(dirno)); //falback
                                 _events.OnCallLogEntryRequested?.Invoke(this, queuedCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
                             }
