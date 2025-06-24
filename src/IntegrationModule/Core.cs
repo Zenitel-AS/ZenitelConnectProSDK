@@ -195,7 +195,10 @@ namespace ConnectPro
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)

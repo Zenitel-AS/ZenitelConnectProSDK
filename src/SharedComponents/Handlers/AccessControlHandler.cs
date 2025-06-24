@@ -23,7 +23,9 @@ namespace ConnectPro.Handlers
         /// Gets or sets the IP address of the parent device.
         /// </summary>
         public string ParentIpAddress { get; set; } = "";
-        
+        /// <summary>
+        /// Gets the event data for the last door opening event.
+        /// </summary>
         public OpenDoorEventData OpenDoorEventData { get; private set; }
 
         /// <summary>
@@ -64,6 +66,7 @@ namespace ConnectPro.Handlers
         /// Opens the door associated with the specified device.
         /// </summary>
         /// <param name="ele">The device for which the door needs to be opened.</param>
+        /// <param name="operatorDirNo">The device acting as an operator.</param>
         public void OpenDoor(Device ele, string operatorDirNo)
         {
             wamp_response response = _wamp.PostOpenDoor(ele.dirno);
@@ -99,7 +102,10 @@ namespace ConnectPro.Handlers
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
+        /// <summary>
+        /// Disposes resources and unsubscribes from events.
+        /// </summary>
+        /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)
