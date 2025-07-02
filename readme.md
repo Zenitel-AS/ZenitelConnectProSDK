@@ -123,9 +123,6 @@ The **Integration Modules** are backend libraries. These modules implement the s
 
 ---
 
-Here is the **updated "Getting Started"** section with the recommended improvements:
-
----
 
 ### **3. Getting Started**
 
