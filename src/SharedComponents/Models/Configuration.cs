@@ -1,4 +1,6 @@
-﻿namespace ConnectPro.Models
+﻿using ConnectPro.DTO;
+
+namespace ConnectPro.Models
 {
     /// <summary>
     /// Represents the system configuration settings for connecting to the server and managing operator settings.
@@ -121,5 +123,57 @@
         }
 
         #endregion
+
+        #region DTO Conversion
+
+        /// <summary>
+        /// Converts this Configuration model object to its DTO representation.
+        /// </summary>
+        public ConfigurationDto ToDto()
+        {
+            return new ConfigurationDto
+            {
+                ID = this.ID,
+                ControllerName = this.ControllerName,
+                ServerAddr = this.ServerAddr,
+                UserName = this.UserName,
+                Password = this.Password,
+                Port = this.Port,
+                Realm = this.Realm,
+                OperatorDirNo = this.OperatorDirNo,
+                DisplayConfigurationInSmartClient = this.DisplayConfigurationInSmartClient,
+                EnablePopupWindow = this.EnablePopupWindow,
+                MachineName = this.MachineName,
+                Operator = this.Operator?.ToDto()
+            };
+        }
+
+        /// <summary>
+        /// Creates a Configuration model instance from a ConfigurationDto.
+        /// </summary>
+        public static Configuration FromDto(ConfigurationDto dto)
+        {
+            if (dto == null) return null;
+
+            return new Configuration
+            {
+                ID = dto.ID,
+                ControllerName = dto.ControllerName,
+                ServerAddr = dto.ServerAddr,
+                UserName = dto.UserName,
+                Password = dto.Password,
+                Port = dto.Port,
+                Realm = dto.Realm,
+                OperatorDirNo = dto.OperatorDirNo,
+                DisplayConfigurationInSmartClient = dto.DisplayConfigurationInSmartClient,
+                EnablePopupWindow = dto.EnablePopupWindow,
+                MachineName = dto.MachineName,
+                Operator = Operator.FromDto(dto.Operator)
+            };
+        }
+
+        #endregion
+
+
     }
 }

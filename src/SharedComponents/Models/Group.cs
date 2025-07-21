@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ConnectPro.DTO;
+using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -157,5 +158,44 @@ namespace ConnectPro.Models
         }
 
         #endregion
+
+        #region DTO Conversion
+
+        /// <summary>
+        /// Converts this Group model object to its DTO representation.
+        /// </summary>
+        public GroupDto ToDto()
+        {
+            return new GroupDto
+            {
+                Id = this.Id,
+                Dirno = this.Dirno,
+                DisplayName = this.DisplayName,
+                Priority = this.Priority,
+                Members = this.Members
+                // IsBusy and BroadcastedMessageName are not included in DTO by default
+            };
+        }
+
+        /// <summary>
+        /// Creates a Group model instance from a GroupDto.
+        /// </summary>
+        public static Group FromDto(GroupDto dto)
+        {
+            if (dto == null) return null;
+
+            return new Group
+            {
+                Id = dto.Id,
+                Dirno = dto.Dirno,
+                DisplayName = dto.DisplayName,
+                Priority = dto.Priority,
+                Members = dto.Members
+                // IsBusy and BroadcastedMessageName: not mapped from DTO
+            };
+        }
+
+        #endregion
+
     }
 }

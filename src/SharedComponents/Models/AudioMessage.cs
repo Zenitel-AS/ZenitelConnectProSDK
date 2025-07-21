@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel;
 using Newtonsoft.Json;
 using Wamp.Client;
+using ConnectPro.DTO;
 
 namespace ConnectPro.Models
 {
@@ -178,6 +179,38 @@ namespace ConnectPro.Models
             };
         }
 
+        #endregion
+
+        #region DTO Conversion
+        public AudioMessageDto ToDto()
+        {
+            return new AudioMessageDto
+            {
+                Id = this.Id,
+                Dirno = this.Dirno,
+                FileName = this.FileName,
+                FilePath = this.FilePath,
+                FileSize = this.FileSize,
+                Duration = this.Duration,
+                IsPlaying = this.IsPlaying
+            };
+        }
+
+        public static AudioMessage FromDto(AudioMessageDto dto)
+        {
+            if (dto == null) return null;
+
+            return new AudioMessage
+            {
+                Id = dto.Id,
+                Dirno = dto.Dirno,
+                FileName = dto.FileName,
+                FilePath = dto.FilePath,
+                FileSize = dto.FileSize,
+                Duration = dto.Duration,
+                IsPlaying = dto.IsPlaying
+            };
+        }
         #endregion
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using ConnectPro.DTO;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ConnectPro.Models
@@ -38,5 +39,38 @@ namespace ConnectPro.Models
         public virtual ICollection<DeviceCamera> DeviceCameras { get; set; } = new List<DeviceCamera>();
 
         #endregion
+
+        #region DTO Conversion
+
+        /// <summary>
+        /// Converts this Camera model object to its DTO representation.
+        /// </summary>
+        public CameraDto ToDto()
+        {
+            return new CameraDto
+            {
+                Id = this.Id,
+                FQID = this.FQID,
+                Name = this.Name
+            };
+        }
+
+        /// <summary>
+        /// Creates a Camera model instance from a CameraDto.
+        /// </summary>
+        public static Camera FromDto(CameraDto dto)
+        {
+            if (dto == null) return null;
+
+            return new Camera
+            {
+                Id = dto.Id,
+                FQID = dto.FQID,
+                Name = dto.Name
+            };
+        }
+
+        #endregion
+
     }
 }

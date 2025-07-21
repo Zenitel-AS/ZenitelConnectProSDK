@@ -1,4 +1,5 @@
-﻿using ConnectPro.Enums;
+﻿using ConnectPro.DTO;
+using ConnectPro.Enums;
 using ConnectPro.Interfaces;
 using Newtonsoft.Json;
 using System;
@@ -203,6 +204,46 @@ namespace ConnectPro.Models
         /// </summary>
         [NotMapped]
         public EventHandler<CallState> OnCallStateChange { get; set; }
+        #endregion
+
+        #region DTO Conversion
+        public DeviceDto ToDto()
+        {
+            return new DeviceDto
+            {
+                DeviceId = this.DeviceId,
+                DeviceIp = this.device_ip,
+                Dirno = this.dirno,
+                Location = this.location,
+                Name = this.name,
+                DeviceType = this.device_type,
+                DeviceState = this.DeviceState,
+                CallState = this.CallState,
+                Username = this.Username,
+                Password = this.Password,
+                ServerIP = this.ServerIP
+            };
+        }
+        public static Device FromDto(DeviceDto dto)
+        {
+            if (dto == null) return null;
+
+            return new Device
+            {
+                DeviceId = dto.DeviceId,
+                device_ip = dto.DeviceIp,
+                dirno = dto.Dirno,
+                location = dto.Location,
+                name = dto.Name,
+                device_type = dto.DeviceType,
+                DeviceState = dto.DeviceState,
+                CallState = dto.CallState,
+                Username = dto.Username,
+                Password = dto.Password,
+                ServerIP = dto.ServerIP
+                // NodeNumber, Cameras, DeviceCameras, OnCallStateChange: not mapped from DTO
+            };
+        }
         #endregion
     }
 }

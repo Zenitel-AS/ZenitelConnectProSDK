@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ConnectPro.DTO;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -26,5 +27,36 @@ namespace ConnectPro.Models
         public string DirectoryNumber { get; set; }
 
         #endregion
+
+        #region DTO Conversion
+
+        /// <summary>
+        /// Converts this Operator model object to its DTO representation.
+        /// </summary>
+        public OperatorDto ToDto()
+        {
+            return new OperatorDto
+            {
+                MachineName = this.MachineName,
+                DirectoryNumber = this.DirectoryNumber
+            };
+        }
+
+        /// <summary>
+        /// Creates an Operator model instance from an OperatorDto.
+        /// </summary>
+        public static Operator FromDto(OperatorDto dto)
+        {
+            if (dto == null) return null;
+
+            return new Operator
+            {
+                MachineName = dto.MachineName,
+                DirectoryNumber = dto.DirectoryNumber
+            };
+        }
+
+        #endregion
+
     }
 }

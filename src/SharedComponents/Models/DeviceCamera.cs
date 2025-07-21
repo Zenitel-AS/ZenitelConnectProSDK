@@ -1,4 +1,5 @@
-﻿using ConnectPro.Interfaces;
+﻿using ConnectPro.DTO;
+using ConnectPro.Interfaces;
 using System.ComponentModel.DataAnnotations;
 
 namespace ConnectPro.Models
@@ -31,5 +32,38 @@ namespace ConnectPro.Models
         public virtual ICamera Camera { get; set; }
 
         #endregion
+
+        #region DTO Conversion
+
+        /// <summary>
+        /// Converts this DeviceCamera model object to its DTO representation.
+        /// </summary>
+        public DeviceCameraDto ToDto()
+        {
+            return new DeviceCameraDto
+            {
+                DeviceId = this.DeviceId,
+                CameraId = this.CameraId
+                // Device and Camera navigation properties are not included in DTO by default
+            };
+        }
+
+        /// <summary>
+        /// Creates a DeviceCamera model instance from a DeviceCameraDto.
+        /// </summary>
+        public static DeviceCamera FromDto(DeviceCameraDto dto)
+        {
+            if (dto == null) return null;
+
+            return new DeviceCamera
+            {
+                DeviceId = dto.DeviceId,
+                CameraId = dto.CameraId
+                // Device and Camera: not mapped from DTO
+            };
+        }
+
+        #endregion
+
     }
 }

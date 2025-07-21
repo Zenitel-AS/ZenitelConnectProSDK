@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using ConnectPro.DTO;
+using Newtonsoft.Json;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -124,6 +125,52 @@ namespace ConnectPro.Models
             }
         }
 
+        #endregion
+
+        #region DTO Conversion
+        /// <summary>
+        /// Converts this CallLog model object to its DTO representation.
+        /// </summary>
+        public CallLogDto ToDto()
+        {
+            return new CallLogDto
+            {
+                Id = this.Id,
+                Time = this.Time,
+                DeviceName = this.DeviceName,
+                Location = this.Location,
+                FromDirno = this.FromDirno,
+                ToDirno = this.ToDirno,
+                AnsweredByDirno = this.AnsweredByDirno,
+                CallType = this.CallType,
+                Reason = this.Reason,
+                State = this.State,
+                sender = this.sender
+            };
+        }
+
+        /// <summary>
+        /// Creates a CallLog model from a DTO.
+        /// </summary>
+        public static CallLog FromDto(CallLogDto dto)
+        {
+            if (dto == null) return null;
+
+            return new CallLog
+            {
+                Id = dto.Id,
+                Time = dto.Time,
+                DeviceName = dto.DeviceName,
+                Location = dto.Location,
+                FromDirno = dto.FromDirno,
+                ToDirno = dto.ToDirno,
+                AnsweredByDirno = dto.AnsweredByDirno,
+                CallType = dto.CallType,
+                Reason = dto.Reason,
+                State = dto.State,
+                sender = dto.sender
+            };
+        }
         #endregion
     }
 }
