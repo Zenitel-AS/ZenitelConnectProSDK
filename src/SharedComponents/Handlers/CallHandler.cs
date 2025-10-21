@@ -236,6 +236,7 @@ namespace ConnectPro.Handlers
                             RemoveFromActiveCall(activeDevice);
                         }
                         _events.OnDeviceStateChange?.Invoke(this, callElement);
+                        _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
                         this.IsHandlingCallStatusChange = false;
 
                         break;

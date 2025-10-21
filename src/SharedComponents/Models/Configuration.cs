@@ -30,8 +30,11 @@ namespace ConnectPro.Models
         public string UserName { get; set; }
 
         /// <summary>
-        /// Gets or sets the password for authentication.
+        /// Gets or sets the password for authentication. 
+        /// WARNING: Sensitive data! Never expose in API responses, logs, or UI. 
+        /// Always hash before storage.
         /// </summary>
+        [Newtonsoft.Json.JsonIgnore]
         public string Password { get; set; }
 
         /// <summary>
@@ -106,7 +109,7 @@ namespace ConnectPro.Models
                         UserName = "";
                         break;
                     case 2:
-                        Password = "";
+                        Password = Tools.Cryptography.Encrypt(""); // Use built in tools for encryption.
                         break;
                     case 3:
                         Port = "8086";
@@ -137,7 +140,6 @@ namespace ConnectPro.Models
                 ControllerName = this.ControllerName,
                 ServerAddr = this.ServerAddr,
                 UserName = this.UserName,
-                Password = this.Password,
                 Port = this.Port,
                 Realm = this.Realm,
                 OperatorDirNo = this.OperatorDirNo,
@@ -161,7 +163,6 @@ namespace ConnectPro.Models
                 ControllerName = dto.ControllerName,
                 ServerAddr = dto.ServerAddr,
                 UserName = dto.UserName,
-                Password = dto.Password,
                 Port = dto.Port,
                 Realm = dto.Realm,
                 OperatorDirNo = dto.OperatorDirNo,

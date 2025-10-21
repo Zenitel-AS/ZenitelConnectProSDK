@@ -29,10 +29,10 @@ namespace ConnectPro.DTO
         /// </summary>
         public string UserName { get; set; }
 
-        /// <summary>
-        /// Gets or sets the password for authentication.
-        /// </summary>
-        public string Password { get; set; }
+        ///// <summary>
+        ///// Gets or sets the password for authentication.
+        ///// </summary>
+        //public string Password { get; set; }
 
         /// <summary>
         /// Gets or sets the port number for server communication.
@@ -87,7 +87,6 @@ namespace ConnectPro.DTO
                 ControllerName = this.ControllerName,
                 ServerAddr = this.ServerAddr,
                 UserName = this.UserName,
-                Password = this.Password,
                 Port = this.Port,
                 Realm = this.Realm,
                 OperatorDirNo = this.OperatorDirNo,
@@ -111,7 +110,6 @@ namespace ConnectPro.DTO
                 ControllerName = cfg.ControllerName,
                 ServerAddr = cfg.ServerAddr,
                 UserName = cfg.UserName,
-                Password = cfg.Password,
                 Port = cfg.Port,
                 Realm = cfg.Realm,
                 OperatorDirNo = cfg.OperatorDirNo,
