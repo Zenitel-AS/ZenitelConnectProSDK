@@ -39,7 +39,6 @@ namespace ConnectPro.Tools
         private string _logFilePath;
         private readonly object lockObject = new object();
         private readonly long maxLogFileSizeBytes = 10 * 1024 * 1024; // 10 MB
-        private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
         #endregion
 
@@ -103,19 +102,23 @@ namespace ConnectPro.Tools
         /// <param name="level">The severity level of the log message.</param>
         /// <param name="message">The message to be logged.</param>
         /// <param name="ex">Optional exception details to include in the log.</param>
-        public async Task LogMessage(LogLevel level, string message, Exception ex = null)
+        public Task LogMessage(LogLevel level, string message, Exception ex = null)
         {
+            if (disposed)
+            {
+                // Logger is disposed; don't attempt to log.
+                return Task.CompletedTask;
+            }
+
             try
             {
-                if (ShouldLog(message))
-                {
-                    string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] - {message}\n{ex}";
-                    await WriteToLogFileAsync(logEntry, cancellationTokenSource.Token);
-                }
+                string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] - {message}\n{ex}";
+                return WriteToLogFileAsync(logEntry);
             }
             catch (Exception logEx)
             {
                 HandleLoggingException(logEx);
+                return Task.CompletedTask;
             }
         }
 
@@ -157,22 +160,24 @@ namespace ConnectPro.Tools
             }
         }
 
-
         /// <summary>
         /// Asynchronously writes a log entry to the log file.
         /// </summary>
         /// <param name="logEntry">The log message to write.</param>
-        /// <param name="cancellationToken">A cancellation token to handle task cancellation.</param>
-        private async Task WriteToLogFileAsync(string logEntry, CancellationToken cancellationToken)
+        private Task WriteToLogFileAsync(string logEntry)
         {
-            await Task.Run(() =>
+            // Keep async boundary but offload the actual file I/O to a background thread.
+            return Task.Run(() =>
             {
                 lock (lockObject)
                 {
+                    if (disposed)
+                    {
+                        return;
+                    }
+
                     try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
                         if (!ShouldLog(logEntry))
                         {
                             RotateLogFile();
@@ -186,7 +191,7 @@ namespace ConnectPro.Tools
                         HandleLoggingException(ex);
                     }
                 }
-            }, cancellationToken);
+            });
         }
 
         #endregion
@@ -201,16 +206,27 @@ namespace ConnectPro.Tools
         {
             string archiveFilePath = $"{_logFilePath}_{DateTime.Now:yyyyMMdd_HHmmss}.log";
 
-            logFileWriterLazy.Value.Close();
-            logFileWriterLazy.Value.Dispose();
+            // Close current writer
+            if (logFileWriterLazy.IsValueCreated)
+            {
+                logFileWriterLazy.Value.Close();
+                logFileWriterLazy.Value.Dispose();
+            }
 
-            File.Move(_logFilePath, archiveFilePath);
+            // Move current log file to archive
+            if (File.Exists(_logFilePath))
+            {
+                File.Move(_logFilePath, archiveFilePath);
+            }
 
+            // Recreate writer for the original path
             logFileWriterLazy = new Lazy<StreamWriter>(() =>
             {
                 lock (lockObject)
                 {
-                    return File.AppendText(_logFilePath);
+                    FileStream fileStream = new FileStream(
+                        _logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                    return new StreamWriter(fileStream);
                 }
             });
         }
@@ -221,7 +237,14 @@ namespace ConnectPro.Tools
         /// <param name="ex">The exception that occurred.</param>
         private void HandleLoggingException(Exception ex)
         {
-            Console.WriteLine($"Error while logging: {ex.Message}");
+            try
+            {
+                Console.WriteLine($"Error while logging: {ex.Message}");
+            }
+            catch
+            {
+                // Last-resort: never throw from logger error handling
+            }
         }
 
         /// <summary>
@@ -230,16 +253,34 @@ namespace ConnectPro.Tools
         /// <param name="newLogFilePath">The new file path for logging.</param>
         public void ChangeLogFile(string newLogFilePath)
         {
-            Dispose();
-            _logFilePath = newLogFilePath;
-
-            logFileWriterLazy = new Lazy<StreamWriter>(() =>
+            lock (lockObject)
             {
-                lock (lockObject)
+                _logFilePath = newLogFilePath;
+
+                // Dispose current writer, if any
+                if (logFileWriterLazy.IsValueCreated)
                 {
-                    return File.AppendText(_logFilePath);
+                    try
+                    {
+                        logFileWriterLazy.Value.Dispose();
+                    }
+                    catch
+                    {
+                        // Ignore dispose errors
+                    }
                 }
-            });
+
+                // Recreate lazy writer with the new path
+                logFileWriterLazy = new Lazy<StreamWriter>(() =>
+                {
+                    lock (lockObject)
+                    {
+                        FileStream fileStream = new FileStream(
+                            _logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                        return new StreamWriter(fileStream);
+                    }
+                });
+            }
         }
 
         #endregion
@@ -253,22 +294,23 @@ namespace ConnectPro.Tools
         {
             lock (lockObject)
             {
-                if (!disposed && logFileWriterLazy.IsValueCreated)
+                if (disposed)
+                    return;
+
+                if (logFileWriterLazy.IsValueCreated)
                 {
                     try
                     {
                         logFileWriterLazy.Value.Dispose();
-                        disposed = true;
                     }
                     catch
                     {
                         // Suppress exceptions during disposal
                     }
                 }
-            }
 
-            cancellationTokenSource.Cancel();
-            cancellationTokenSource.Dispose();
+                disposed = true;
+            }
         }
 
         #endregion
