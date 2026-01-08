@@ -58,7 +58,7 @@ namespace ConnectPro.Models
                 {
                     _isBusy = value;
                     OnPropertyChanged(nameof(IsBusy));
-
+                    OnBussyStateChange?.Invoke(this, _isBusy);
                     if (!_isBusy)
                     {
                         BroadcastedMessageName = "Prerecorded Msg";
@@ -89,6 +89,12 @@ namespace ConnectPro.Models
         #endregion
 
         #region Events
+
+        /// <summary>
+        /// Occurs when the bussy state of the group changes.
+        /// </summary>
+        [NotMapped]
+        public EventHandler<bool> OnBussyStateChange { get; set; }
 
         /// <summary>
         /// Occurs when a property value changes.
