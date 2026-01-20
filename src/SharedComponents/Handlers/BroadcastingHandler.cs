@@ -240,7 +240,14 @@ namespace ConnectPro.Handlers
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
+        /// <summary>
+        /// Releases the unmanaged resources used by the object and optionally releases the managed resources.
+        /// </summary>
+        /// <remarks>This method is called by public <c>Dispose()</c> methods and the finalizer, if
+        /// implemented. Override this method to release resources specific to derived classes. Always call the base
+        /// class implementation when overriding.</remarks>
+        /// <param name="disposing"><see langword="true"/> to release both managed and unmanaged resources; <see langword="false"/> to release
+        /// only unmanaged resources.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)

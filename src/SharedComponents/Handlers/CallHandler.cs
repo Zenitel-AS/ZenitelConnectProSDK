@@ -251,6 +251,8 @@ namespace ConnectPro.Handlers
                         _events.OnDeviceStateChange?.Invoke(this, callElement);
                         break;
                 }
+
+                UpdateGroupBusyFromCall(callElement);
             }
         }
        
@@ -305,7 +307,7 @@ namespace ConnectPro.Handlers
        
         private void HandleQueuesAndCallsSync(object sender, EventArgs e)
         {
-            Task.Run(async () => await GetAllCalsAndQueues());
+            Task.Run(async () => await GetAllCallsAndQueues());
         }
       
         /// <summary>
@@ -403,6 +405,8 @@ namespace ConnectPro.Handlers
                             _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
                             _events.OnActiveCallListValueChange?.Invoke(this, EventArgs.Empty);
                             _events.CallHandlerPopupRequested?.Invoke(this, false);
+
+
                         }
                         catch (Exception ex)
                         {
@@ -544,7 +548,7 @@ namespace ConnectPro.Handlers
         /// Retrieves and synchronizes all active and queued calls.
         /// </summary>
 
-        private async Task GetAllCalsAndQueues()
+        private async Task GetAllCallsAndQueues()
         {
             await Task.Run(() =>
             {
@@ -585,6 +589,11 @@ namespace ConnectPro.Handlers
                                     _collections.RegisteredDevices.Where(x => x.dirno == call.ToDirnoCurrent).FirstOrDefault().CallState = call.CallState;
                                 }
                                 _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
+
+                                if(_collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault() != null)
+                                {
+                                    _collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault().OnBussyStateChange?.Invoke(this, IsBusy(call.CallState));
+                                }
                             }
                             catch (Exception exe)
                             {
@@ -626,7 +635,7 @@ namespace ConnectPro.Handlers
         /// <param name="state">Optional call state filter.</param>
         /// <returns>A list of active calls.</returns>
         
-        public async Task<List<CallElement>> GetAllCals(string dirno = null, string callid = null, string state = null)
+        public async Task<List<CallElement>> GetAllCalls(string dirno = null, string callid = null, string state = null)
         {
             List<CallElement> calls = new List<CallElement>();
             await Task.Run(() =>
@@ -680,7 +689,7 @@ namespace ConnectPro.Handlers
         public async Task DeleteAllCall()
         {
 
-            List<CallElement> allCalls = await GetAllCals();
+            List<CallElement> allCalls = await GetAllCalls();
             lock (_deleteAllCallLock)
             {
                 foreach (var call in allCalls)
@@ -757,7 +766,7 @@ namespace ConnectPro.Handlers
                 {
                     try
                     {
-                        List<CallElement> calls = GetAllCals(null, callId.ToString()).Result;
+                        List<CallElement> calls = GetAllCalls(null, callId.ToString()).Result;
                         if (calls != null)
                         {
                             if (calls.Count > 0)
@@ -861,5 +870,48 @@ namespace ConnectPro.Handlers
 
         #endregion
 
+        #region Helpers
+
+        private void UpdateGroupBusyFromCall(CallElement callElement)
+        {
+            // Candidate dirnos that may represent a group in this call
+            var candidates = new[] { callElement.ToDirnoCurrent, callElement.ToDirno, callElement.FromDirno };
+
+            foreach (var dirno in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(dirno))
+                    continue;
+
+                var group = _collections?.Groups?.FirstOrDefault(g => g.Dirno == dirno);
+                if (group == null)
+                    continue;
+
+                group.OnBussyStateChange?.Invoke(this, IsBusy(callElement.CallState));
+            }
+        }
+
+
+        public static bool IsBusy(CallState state)
+        {
+            switch (state)
+            {
+                case CallState.init:
+                case CallState.forwarding:
+                case CallState.queued:
+                case CallState.ringing:
+                case CallState.in_call:
+                    return true;
+
+                case CallState.reachable:
+                case CallState.ended:
+                case CallState.fault:
+                    return false;
+
+                default:
+                    return false;
+            }
+        }
+
+        #endregion
     }
 }

@@ -182,6 +182,10 @@ namespace ConnectPro.Models
         #endregion
 
         #region DTO Conversion
+        /// <summary>
+        /// Converts the current <see cref="AudioMessage"/> instance to an <see cref="AudioMessageDto"/> object.
+        /// </summary>
+        /// <returns>An <see cref="AudioMessageDto"/> that contains the data from this <see cref="AudioMessage"/> instance.</returns>
         public AudioMessageDto ToDto()
         {
             return new AudioMessageDto
@@ -195,7 +199,12 @@ namespace ConnectPro.Models
                 IsPlaying = this.IsPlaying
             };
         }
-
+        /// <summary>
+        /// Creates a new <see cref="AudioMessage"/> instance from the specified <see cref="AudioMessageDto"/>.
+        /// </summary>
+        /// <param name="dto">The data transfer object containing audio message information to convert. Can be <see langword="null"/>.</param>
+        /// <returns>An <see cref="AudioMessage"/> initialized with values from <paramref name="dto"/>, or <see langword="null"/>
+        /// if <paramref name="dto"/> is <see langword="null"/>.</returns>
         public static AudioMessage FromDto(AudioMessageDto dto)
         {
             if (dto == null) return null;

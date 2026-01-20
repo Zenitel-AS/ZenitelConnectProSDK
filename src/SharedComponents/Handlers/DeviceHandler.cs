@@ -1,5 +1,7 @@
 ﻿using ConnectPro.Models;
+using ConnectPro.Models.GPIO;
 using ConnectPro.Tools;
+using SharedComponents.Models.GPIO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,44 +13,40 @@ using Timer = System.Timers.Timer;
 namespace ConnectPro.Handlers
 {
     /// <summary>
-    /// Handles device management, including registration, retrieval, state updates, 
+    /// Handles device management, including registration, retrieval, state updates,
     /// and interaction with the WAMP client.
     /// </summary>
-    
     public class DeviceHandler : IDisposable
     {
         #region Fields & Locks
 
-        private Collections _collections;
-        private Events _events;
-        private WampClient _wamp;
+        private readonly Collections _collections;
+        private readonly Events _events;
+        private readonly WampClient _wamp;
+        private readonly IGpioTransport _gpioTransport;
 
         /// <summary>
-        /// Synchronization lock for device retrieval operations.
+        /// Synchronization lock for device retrieval and registration operations.
         /// </summary>
-        
-        private object _lockObj = new object();
-        
+        private readonly object _lockObj = new object();
+
         /// <summary>
         /// Timer to periodically retrieve registered devices.
         /// </summary>
-        
         private Timer DeviceRetrievalTimer { get; set; }
 
         #endregion
 
         #region Properties
-       
+
         /// <summary>
         /// Indicates whether device retrieval is currently in progress.
         /// </summary>
-        
         public bool IsExecutingDeviceRetrieval { get; set; } = false;
-        
+
         /// <summary>
         /// Stores the IP address of the parent device.
         /// </summary>
-        
         public string ParentIpAddress { get; set; } = "";
 
         #endregion
@@ -62,19 +60,22 @@ namespace ConnectPro.Handlers
         /// <param name="events">Reference to the events object handling device-related events.</param>
         /// <param name="wamp">Reference to the WAMP client for communication.</param>
         /// <param name="parentIpAddress">Optional parent device IP address.</param>
-       
         public DeviceHandler(ref Collections collections,
                              ref Events events,
                              ref WampClient wamp,
                              string parentIpAddress = "")
         {
-            _collections = collections;
-            _events = events;
-            _wamp = wamp;
-            ParentIpAddress = parentIpAddress;
+            _collections = collections ?? throw new ArgumentNullException(nameof(collections));
+            _events = events ?? throw new ArgumentNullException(nameof(events));
+            _wamp = wamp ?? throw new ArgumentNullException(nameof(wamp));
+            ParentIpAddress = parentIpAddress ?? "";
+
+            // GPIO transport (one per handler / one per WAMP client)
+            _gpioTransport = new WampGpioTransport(_wamp);
 
             _wamp.OnWampDeviceRegistrationEvent += HandleDeviceRegistration;
             _wamp.OnWampDeviceExtendedStatusEvent += HandleDeviceExtendedStatus;
+
             _events.OnDeviceRetrievalStart += HandleDeviceRetrievalStartEvent;
             _events.OnDeviceStateChange += HandleDeviceStateChange;
         }
@@ -82,77 +83,81 @@ namespace ConnectPro.Handlers
         #endregion
 
         #region Event Handlers
-        
+
         /// <summary>
         /// Handles device registration events from the WAMP client.
         /// </summary>
-        /// <param name="sender">The event sender.</param>
-        /// <param name="ele">The device registration element.</param>
-        
         private void HandleDeviceRegistration(object sender, WampClient.wamp_device_registration_element ele)
         {
-            Device newDevice = new Device(ele); //Convert wamp sdk element to Device class
+            if (ele == null)
+                return;
 
-            if (!_collections.RegisteredDevices.Any(x => x.device_ip == ele.device_ip))
+            // IMPORTANT: registration and retrieval both mutate the same list -> use the same lock.
+            lock (_lockObj)
             {
-                _collections.RegisteredDevices.Add(newDevice);
-                _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
-            }
-            else
-            {
-                Device device = _collections.RegisteredDevices.FirstOrDefault(x => x.device_ip == ele.device_ip);
-                if (device != null)
+                Device newDevice = new Device(ele, _gpioTransport); // Option A: Device owns its runtime GPIO
+
+                if (_collections.RegisteredDevices == null)
+                    _collections.RegisteredDevices = new List<Device>();
+
+                if (!_collections.RegisteredDevices.Any(x => x.device_ip == ele.device_ip))
                 {
-                    _collections.RegisteredDevices.Remove(device);
                     _collections.RegisteredDevices.Add(newDevice);
                     _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
                 }
-            }
+                else
+                {
+                    Device existing = _collections.RegisteredDevices.FirstOrDefault(x => x.device_ip == ele.device_ip);
+                    if (existing != null)
+                    {
+                        // Dispose old GPIO runtime model before replacing.
+                        DetachGpio(existing);
 
+                        _collections.RegisteredDevices.Remove(existing);
+                        _collections.RegisteredDevices.Add(newDevice);
+                        _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
         }
-        
+
         /// <summary>
         /// Handles the start of the device retrieval process.
         /// </summary>
-        /// <param name="sender">The event sender.</param>
-        /// <param name="e">Event arguments.</param>
-        
         private void HandleDeviceRetrievalStartEvent(object sender, EventArgs e)
         {
-            Task.Run(async () => await RetrieveRegisteredDevices());
+            Task.Run(async () => await RetrieveRegisteredDevices().ConfigureAwait(false));
         }
-        
+
         /// <summary>
         /// Handles device state changes and updates the internal collections accordingly.
         /// </summary>
-        /// <param name="sender">The event sender.</param>
-        /// <param name="callElement">The call element containing updated state information.</param>
-        
         private void HandleDeviceStateChange(object sender, CallElement callElement)
         {
+            if (callElement == null)
+                return;
+
             try
             {
-                Device device_to_dirno = _collections.RegisteredDevices.Where(x => x.dirno == callElement.ToDirno).FirstOrDefault();
-                Device device_to_dirno_current = _collections.RegisteredDevices.Where(x => x.dirno == callElement.ToDirnoCurrent).FirstOrDefault();
-                Device device_from_dirno = _collections.RegisteredDevices.Where(x => x.dirno == callElement.FromDirno).FirstOrDefault();
+                // Call-state updates mutate devices; you may also lock if you see concurrent list replacement issues.
+                // Here we assume list replacement is guarded by _lockObj and this is mostly updating existing instances.
+                Device device_to_dirno = _collections.RegisteredDevices?.FirstOrDefault(x => x.dirno == callElement.ToDirno);
+                Device device_to_dirno_current = _collections.RegisteredDevices?.FirstOrDefault(x => x.dirno == callElement.ToDirnoCurrent);
+                Device device_from_dirno = _collections.RegisteredDevices?.FirstOrDefault(x => x.dirno == callElement.FromDirno);
 
                 if (device_to_dirno != null)
-                    _collections.RegisteredDevices
-                        .Where(x => x.dirno == callElement.ToDirno)
-                        .First().CallState = callElement.CallState == Enums.CallState.ended ? Enums.CallState.reachable : callElement.CallState;
+                    device_to_dirno.CallState =
+                        callElement.CallState == Enums.CallState.ended ? Enums.CallState.reachable : callElement.CallState;
 
                 if (device_to_dirno_current != null)
-                    _collections.RegisteredDevices
-                        .Where(x => x.dirno == callElement.ToDirnoCurrent)
-                        .First().CallState = callElement.CallState == Enums.CallState.ended ? Enums.CallState.reachable : callElement.CallState;
+                    device_to_dirno_current.CallState =
+                        callElement.CallState == Enums.CallState.ended ? Enums.CallState.reachable : callElement.CallState;
 
                 if (device_from_dirno != null)
-                    _collections.RegisteredDevices
-                        .Where(x => x.dirno == callElement.FromDirno)
-                        .First().CallState = callElement.CallState == Enums.CallState.ended ? Enums.CallState.reachable : callElement.CallState;
+                    device_from_dirno.CallState =
+                        callElement.CallState == Enums.CallState.ended ? Enums.CallState.reachable : callElement.CallState;
 
                 _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
-
             }
             catch (Exception exe)
             {
@@ -162,10 +167,15 @@ namespace ConnectPro.Handlers
 
         private void HandleDeviceExtendedStatus(object sender, WampClient.wamp_device_extended_status ele)
         {
-            ExtendedStatus deviceStatus = new ExtendedStatus(ele);
-            if (deviceStatus != null)
+            try
             {
-                _events.OnDeviceTest?.Invoke(this, deviceStatus);
+                ExtendedStatus deviceStatus = new ExtendedStatus(ele);
+                if (deviceStatus != null)
+                    _events.OnDeviceTest?.Invoke(this, deviceStatus);
+            }
+            catch (Exception ex)
+            {
+                _events.OnExceptionThrown?.Invoke(this, ex);
             }
         }
 
@@ -176,7 +186,6 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Retrieves the list of registered devices from the WAMP client and updates the collections.
         /// </summary>
-
         public async Task RetrieveRegisteredDevices()
         {
             await Task.Run(() =>
@@ -185,104 +194,130 @@ namespace ConnectPro.Handlers
                 {
                     try
                     {
-                        if (!IsExecutingDeviceRetrieval)
+                        if (IsExecutingDeviceRetrieval)
                         {
-                            IsExecutingDeviceRetrieval = true;
-                            if (_wamp.IsConnected)
-                            {
-                                _collections.RegisteredDevices = GetRegisteredDevices().ToList();
-                                _events.OnQueuesAndCallsSync?.Invoke(this, new EventArgs());
-
-                                if (_collections.RegisteredDevices != null)
-                                    DeviceRetrievalTimer?.Stop();
-
-                                _events.OnDeviceListChange?.Invoke(this, new EventArgs());
-                            }
-                            IsExecutingDeviceRetrieval = false;
+                            _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
+                            return;
                         }
-                        _events.OnDeviceRetrievalEnd?.Invoke(this, new EventArgs());
+
+                        IsExecutingDeviceRetrieval = true;
+
+                        if (_wamp.IsConnected)
+                        {
+                            // Detach GPIO from old instances before replacing the list (prevents leaks).
+                            if (_collections.RegisteredDevices != null)
+                            {
+                                foreach (var old in _collections.RegisteredDevices)
+                                    DetachGpio(old);
+                            }
+
+                            _collections.RegisteredDevices = GetRegisteredDevices().ToList();
+                            _events.OnQueuesAndCallsSync?.Invoke(this, EventArgs.Empty);
+
+                            if (_collections.RegisteredDevices != null)
+                                DeviceRetrievalTimer?.Stop();
+
+                            _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
+                        }
+
+                        IsExecutingDeviceRetrieval = false;
+                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
                     }
                     catch (Exception exe)
                     {
+                        IsExecutingDeviceRetrieval = false;
+
                         _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
-                        _events.OnDeviceRetrievalEnd?.Invoke(this, new EventArgs());
+                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
                         _events.OnExceptionThrown?.Invoke(this, exe);
                     }
                 }
-            });
+            }).ConfigureAwait(false);
         }
-        
+
         /// <summary>
         /// Retrieves a list of registered devices from the WAMP client.
         /// </summary>
-        /// <returns>A collection of registered devices.</returns>
-        
         public IEnumerable<Device> GetRegisteredDevices()
         {
-            return ObjectConverter.ConvertSdkDeviceElementList(_wamp.requestRegisteredDevices().ToList());
+            // Converter likely creates devices via the basic ctor. We attach runtime GPIO here as a safety net.
+            var devices = ObjectConverter.ConvertSdkDeviceElementList(_wamp.requestRegisteredDevices().ToList());
+
+            if (devices == null)
+                return Enumerable.Empty<Device>();
+
+            foreach (var d in devices)
+                AttachGpio(d);
+
+            return devices;
         }
 
         #endregion
 
         #region Device Control Methods
 
-        /// <summary>
-        /// Simulates a key press on a device.
-        /// </summary>
-        /// <param name="deviceid">Device identifier (can be dirno or MAC address).</param>
-        /// <param name="key">
-        /// Specifies the key to be pressed. Examples:
-        /// <list type="bullet">
-        ///     <item><description><b>on, off</b> - Only relevant for <c>save-autoanswer</c>.</description></item>
-        ///     <item><description><b>save-autoanswer</b> - Does not use press, tap, or release.</description></item>
-        ///     <item><description><b>Set ID:</b> 
-        ///         <c>m</c>, <c>c</c>, <c>p1..p2</c>, digits <c>[0-9]</c>, <c>save-autoanswer</c> 
-        ///         (where <c>p1</c> corresponds to <c>dak0</c>).
-        ///     </description></item>
-        /// </list>
-        /// </param>
-        /// <param name="edge">The edge type.</param>
-        /// <returns>True if the operation was successful, otherwise false.</returns>
-        
-        public bool SimulateKeyPress(string deviceid, string key, string edge)
+        public bool SimulateKeyPress(string dirno, string key, string edge)
         {
-            wamp_response response = _wamp.PostDeviceIdKey("dirno="+deviceid, key,edge);
+            wamp_response response = _wamp.PostDeviceIdKey(dirno, key, edge);
             if (response != null)
-            {
-                if (response.CompletionText == "PostKeyId sucessfully completed.")
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
+                return response.CompletionText == "PostKeyId sucessfully completed.";
+
             return false;
         }
-        
-        /// <summary>
-        /// Initiates a tone test on a specified device.
-        /// </summary>
-        /// <param name="dirno">Directory number of the device.</param>
-        /// <param name="toneGroup">Tone group to test.</param>
-        /// <returns>True if the operation was successful, otherwise false.</returns>
-        
+
         public bool InitiateToneTest(string dirno, string toneGroup)
         {
             wamp_response response = _wamp.ToneTest(dirno, toneGroup);
             if (response != null)
-            {
-                if (response.CompletionText == "ToneTest sucessfully completed.")
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
+                return response.CompletionText == "ToneTest sucessfully completed.";
+
             return false;
+        }
+
+        private void AttachGpio(Device device)
+        {
+            if (device == null)
+                return;
+
+            // If device has no dirno, GPIO cannot be routed/subscribed (dirno is your routing key).
+            if (string.IsNullOrEmpty(device.dirno))
+                return;
+
+            // Avoid re-attaching.
+            if (device.Gpio != null)
+                return;
+
+            // Create runtime GPIO capability object.
+            // Assumes DeviceGpio ctor: DeviceGpio(string dirno, IGpioTransport transport)
+            device.Gpio = new DeviceGpio(device.dirno, _gpioTransport);
+        }
+
+        private void DetachGpio(Device device)
+        {
+            if (device == null)
+                return;
+
+            try
+            {
+                if (!string.IsNullOrEmpty(device.dirno))
+                {
+                    // Always ensure the transport drops callbacks/subscriptions for this device.
+                    _gpioTransport.DisposeFor(device.dirno);
+                }
+
+                // If DeviceGpio is disposable, dispose it too (it may own timers/state).
+                var disposable = device.Gpio as IDisposable;
+                if (disposable != null)
+                    disposable.Dispose();
+            }
+            catch
+            {
+                // Do not throw from handlers; log if you have a hook.
+            }
+            finally
+            {
+                device.Gpio = null;
+            }
         }
 
         #endregion
@@ -291,18 +326,12 @@ namespace ConnectPro.Handlers
 
         private bool _disposed = false;
 
-        /// <summary>
-        /// Disposes resources and unsubscribes from events.
-        /// </summary>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-        /// <summary>
-        /// Disposes resources and unsubscribes from events.
-        /// </summary>
-        /// <param name="disposing"></param>
+
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)
@@ -317,9 +346,22 @@ namespace ConnectPro.Handlers
                     _events.OnDeviceStateChange -= HandleDeviceStateChange;
                 }
 
+                // Detach GPIO for all known devices
+                if (_collections?.RegisteredDevices != null)
+                {
+                    foreach (var d in _collections.RegisteredDevices)
+                        DetachGpio(d);
+                }
+
+                // Dispose transport if possible
+                var gpioDisp = _gpioTransport as IDisposable;
+                if (gpioDisp != null)
+                    gpioDisp.Dispose();
+
                 if (_wamp != null)
                 {
                     _wamp.OnWampDeviceRegistrationEvent -= HandleDeviceRegistration;
+                    _wamp.OnWampDeviceExtendedStatusEvent -= HandleDeviceExtendedStatus;
                 }
 
                 // Dispose timer
@@ -335,6 +377,5 @@ namespace ConnectPro.Handlers
         }
 
         #endregion
-
     }
 }

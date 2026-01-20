@@ -139,4 +139,44 @@ namespace ConnectPro.Enums
         /// <summary>The participant receiving the call.</summary>
         callee
     }
+
+    /// <summary>
+    /// Represents the current logical state of a GPIO (General Purpose Input/Output) line.
+    /// </summary>
+    public enum GpioState
+    {
+        /// <summary>
+        /// The state of the GPIO is unknown or has not yet been reported by the system.
+        /// </summary>
+        Unknown = 0,
+
+        /// <summary>
+        /// The GPIO line is inactive (logical low / de-asserted).
+        /// </summary>
+        Inactive = 1,
+
+        /// <summary>
+        /// The GPIO line is active (logical high / asserted).
+        /// </summary>
+        Active = 2
+    }
+
+    /// <summary>
+    /// Defines the operational direction of a GPIO (General Purpose Input/Output) line.
+    /// </summary>
+    public enum GpioDirection
+    {
+        /// <summary>
+        /// General Purpose Input (GPI).
+        /// The GPIO line is configured as an input and its state is reported by external hardware.
+        /// </summary>
+        Gpi,
+
+        /// <summary>
+        /// General Purpose Output (GPO).
+        /// The GPIO line is configured as an output and its state is controlled by the system.
+        /// </summary>
+        Gpo
+    }
+
 }

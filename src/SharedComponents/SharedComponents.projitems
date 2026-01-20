@@ -46,6 +46,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\DirectoryNumber.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ExceptionLog.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ExtendedStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\GPIO\DeviceGpio.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\GPIO\GpioChangedEventArgs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\GPIO\GpioPoint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\GPIO\IGpioTransport.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Group.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Operator.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\PrerecordedMessage.cs" />
