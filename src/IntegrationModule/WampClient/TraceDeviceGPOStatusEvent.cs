@@ -48,36 +48,28 @@ namespace Wamp.Client
         }
 
         /// <summary>
-        /// Enables the subscription of GPO (General Purpose Output) status changes for a specific device.
-        /// Multiple devices are supported concurrently.
+        /// Enables the subscription of GPO (General Purpose Output) status changes for all devices.
         /// </summary>
-        /// <param name="dirNo">Directory number of the device.</param>
-        public async void TraceDeviceGPOStatusEvent(string dirNo)
+        public async void TraceDeviceGPOStatusEvent()
         {
-            if (string.IsNullOrEmpty(dirNo))
-            {
-                OnChildLogString?.Invoke(this, "Illegal dir no in TraceDeviceGPOStatusEvent.");
-                return;
-            }
-
             try
             {
                 // Fast path: already subscribed
                 lock (_gpoTraceGate)
                 {
-                    if (_gpoSubscriptions.ContainsKey(dirNo))
+                    if (_gpoSubscriptions.Count > 0)
                         return;
                 }
 
-                var options = new TraceDeviceGPOOptions { dirno = dirNo };
-                string uri = TraceWampDeviceDirnoGpo.Replace("{dirno}", dirNo);
+                var options = new TraceDeviceGPOOptions();
+                string uri = "com.zenitel.device.gpo";
 
                 OnChildLogString?.Invoke(this, "TraceDeviceGPOStatusEvent - uri: " + uri);
 
                 IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(uri);
 
-                // Create tracer carrying dirno (for EventEx routing).
-                var tracer = new TracerDeviceGPOStatusEvent(dirNo);
+                // Create tracer for EventEx routing.
+                var tracer = new TracerDeviceGPOStatusEvent(null);
                 tracer.OnDeviceGPOStatusEvent += TracerDeviceGPOStatusEvent_OnDeviceGPOStatusEvent;
                 tracer.OnDebugString += TracerDeviceGPOStatusEvent_OnDebugString;
 
@@ -86,20 +78,24 @@ namespace Wamp.Client
                 // Commit subscription under gate, handle race (double-subscribe).
                 lock (_gpoTraceGate)
                 {
-                    if (_gpoSubscriptions.ContainsKey(dirNo))
+                    if (_gpoSubscriptions.Count > 0)
                     {
                         // Someone subscribed concurrently; discard this subscription.
                         subscription.DisposeAsync();
                         return;
                     }
 
-                    _gpoTracers[dirNo] = tracer;
-                    _gpoSubscriptions[dirNo] = subscription;
+                    _gpoTracers["_global"] = tracer;
+                    _gpoSubscriptions["_global"] = subscription;
                 }
+            }
+            catch (WampException wex) when (wex.ErrorUri == "wamp.error.not_authorized")
+            {
+                OnChildLogString?.Invoke(this, "TraceDeviceGPOStatusEvent - Not authorized to subscribe to GPO events.");
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception: " + ex);
+                OnChildLogString?.Invoke(this, "TraceDeviceGPOStatusEvent - Exception: " + ex.Message);
             }
         }
 
@@ -117,8 +113,12 @@ namespace Wamp.Client
             OnWampDeviceGPOStatusEvent?.Invoke(this, gpioElement);
 
             // Preferred event (dirno + payload).
+            // Use tracer.Dirno for per-device subscriptions, fall back to
+            // the dirno embedded in the JSON payload for global subscriptions.
             var tracer = sender as TracerDeviceGPOStatusEvent;
-            var dirno = tracer != null ? tracer.Dirno : null;
+            var dirno = tracer?.Dirno;
+            if (string.IsNullOrEmpty(dirno))
+                dirno = gpioElement.dirno;
 
             if (!string.IsNullOrEmpty(dirno))
             {

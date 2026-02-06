@@ -298,6 +298,21 @@ namespace Wamp.Client
             /// The type of GPO.
             /// </summary>
             public string type { get; set; }
+
+            /// <summary>
+            /// The operation performed on the GPO (set/clear). Present in GPO status events when <see cref="state"/> is not provided.
+            /// </summary>
+            public string operation { get; set; }
+
+            /// <summary>
+            /// The relays bitmask value. Present in GPO status events (e.g. "0" or "1").
+            /// </summary>
+            public string relays { get; set; }
+
+            /// <summary>
+            /// The directory number of the device. Present in GPIO event payloads.
+            /// </summary>
+            public string dirno { get; set; }
         }
 
 
@@ -591,5 +606,54 @@ namespace Wamp.Client
             /// </summary>
             public string status_type { get; set; }
         }
+        // Inside: namespace Wamp.Client { public partial class WampClient { ... } }
+
+        /// <summary>
+        /// Operator element used by call_queue. Schema shape: { "dirno": "112" }
+        /// </summary>
+        public class wamp_operator_element
+        {
+            /// <summary>
+            /// Directory number of operator.
+            /// </summary>
+            public string dirno { get; set; }
+        }
+
+        /// <summary>
+        /// Rich call element for call queues.
+        /// Schema: call_basic + call_legs[]
+        /// </summary>
+        public class wamp_call_rich_element : wamp_call_element
+        {
+            /// <summary>
+            /// The active legs of the call. Caller leg first.
+            /// </summary>
+            public List<wamp_call_leg_element> call_legs { get; set; }
+        }
+
+        /// <summary>
+        /// Call queue schema:
+        /// - queue_dirno
+        /// - calls[]
+        /// - operators[]
+        /// </summary>
+        public class wamp_call_queue_element
+        {
+            /// <summary>
+            /// The directory number of the call queue.
+            /// </summary>
+            public string queue_dirno { get; set; }
+
+            /// <summary>
+            /// Calls queued in the call queue. Listed in order, first in queue first.
+            /// </summary>
+            public List<wamp_call_rich_element> calls { get; set; }
+
+            /// <summary>
+            /// Operators of the call queue.
+            /// </summary>
+            public List<wamp_operator_element> operators { get; set; }
+        }
+
     }
 }

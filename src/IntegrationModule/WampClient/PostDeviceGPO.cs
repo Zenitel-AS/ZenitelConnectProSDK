@@ -108,11 +108,14 @@ namespace Wamp.Client
             public bool   CompletedSuccessfully = false;
             public string CompletionText = string.Empty;
 
+            public object ResultPayload { get; private set; }
+
 
             public void Result<TMessage>(IWampFormatter<TMessage> formatter, ResultDetails details)
             {
                 RespRecv = true;
                 CompletedSuccessfully = true;
+                ResultPayload = details.OriginalValue;
             }
 
 
@@ -120,6 +123,7 @@ namespace Wamp.Client
             {
                 RespRecv = true;
                 CompletedSuccessfully = true;
+                ResultPayload = details.OriginalValue;
             }
 
 

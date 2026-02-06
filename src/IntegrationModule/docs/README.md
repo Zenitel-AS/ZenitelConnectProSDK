@@ -103,6 +103,11 @@ The **Integration Modules** are backend libraries. These modules implement the s
 5. **Broadcasting**:
    - Enables broadcasting of audio messages and announcements to groups or devices.
 
+6. **GPIO Management**:
+   - Monitor GPI (input) and GPO (output) states on devices in real time.
+   - Control GPO outputs (e.g., activate/deactivate relays) via the `Device.Gpio` model.
+   - Receive real-time GPIO state change events through `DeviceGpio.Changed` or `CoreHandler.Core.Events.OnGpioEvent`.
+
 ---
 
 ### **Key Notes**
@@ -415,7 +420,77 @@ CoreHandler.Core.AccessControlHandler.OpenDoor(selectedDevice);
 
 ---
 
-### **F. Event Handling in the SDK**  
+### **F. GPIO (General Purpose Input/Output) Management**
+
+The SDK provides full support for monitoring and controlling **GPIO** (General Purpose Input/Output) lines on Zenitel devices. This includes both **GPI** (inputs, e.g., door sensors, buttons) and **GPO** (outputs, e.g., relays, LEDs).
+
+GPIO state is managed per-device through the `Device.Gpio` property, which exposes a `DeviceGpio` runtime model. This model:
+- Automatically subscribes to real-time GPI/GPO change events via WAMP.
+- Loads an initial snapshot of all GPIO points when the device is retrieved.
+- Provides methods to activate or deactivate GPO outputs.
+
+#### **Accessing GPIO State for a Device**
+
+```csharp
+var device = CoreHandler.Core.Collection.RegisteredDevices
+    .FirstOrDefault(d => d.dirno == "1001");
+
+if (device?.Gpio != null)
+{
+    // Read all GPI (input) points
+    foreach (var input in device.Gpio.Inputs)
+    {
+        Console.WriteLine($"GPI {input.Id}: {input.State}");
+    }
+
+    // Read all GPO (output) points
+    foreach (var output in device.Gpio.Outputs)
+    {
+        Console.WriteLine($"GPO {output.Id}: {output.State}");
+    }
+}
+```
+
+#### **Listening for GPIO Changes**
+
+##### **Per-Device: `DeviceGpio.Changed` Event**
+```csharp
+device.Gpio.Changed += (sender, args) =>
+{
+    Console.WriteLine($"Device {args.Dirno} - GPIO {args.Point.Id} " +
+                      $"({args.Point.Direction}): {args.Point.State}");
+};
+```
+
+##### **Global: `CoreHandler.Core.Events.OnGpioEvent`**
+```csharp
+CoreHandler.Core.Events.OnGpioEvent += (sender, gpioEventArgs) =>
+{
+    Console.WriteLine($"GPIO event on device {gpioEventArgs.Dirno}: " +
+                      $"{gpioEventArgs.Element.id} = {gpioEventArgs.Element.state}");
+};
+```
+
+#### **Controlling GPO Outputs**
+```csharp
+// Activate a relay indefinitely
+await device.Gpio.ActivateAsync("relay1", timeSeconds: null, CancellationToken.None);
+
+// Activate a relay for 5 seconds
+await device.Gpio.ActivateAsync("relay1", timeSeconds: 5, CancellationToken.None);
+
+// Deactivate a relay
+await device.Gpio.DeactivateAsync("relay1", CancellationToken.None);
+```
+
+#### **Refreshing GPIO State**
+```csharp
+await device.Gpio.RefreshAsync(CancellationToken.None);
+```
+
+---
+
+### **G. Event Handling in the SDK**
 
 The SDK provides a robust **event-driven architecture**, allowing UI and logic components to react dynamically.
 
@@ -443,6 +518,7 @@ The **Zenitel Connect Pro SDK** provides a **modular, event-driven, and centrali
 - **Audio analytics**
 - **Broadcasting**
 - **Access control**
+- **GPIO (General Purpose I/O)** – monitor inputs, control outputs, and receive real-time state changes
 - **Real-time event handling**
 - **Seamless UI integration**
 
@@ -450,6 +526,7 @@ The **Zenitel Connect Pro SDK** provides a **modular, event-driven, and centrali
 ✅ **Collections are auto-populated**; no manual fetching is required.  
 ✅ **Set `OperatorDirNo` after connection & device retrieval, before placing calls or sending messages**.  
 ✅ **Use `OnExceptionThrown` for centralized error handling**.  
+✅ **GPIO state is auto-loaded per device**; use `Device.Gpio` to read inputs/outputs and subscribe to changes.
 
 ---
 
@@ -479,6 +556,7 @@ The SDK provides robust event handling to track changes and updates in real time
 | `OnGroupsMsgUpdate`             | Fires when a group broadcast update is received.                            |
 | `OnDoorOpen`                    | Fires when a door open event is detected.                                   |
 | `OnAudioMessagesChange`         | Fires when an audio message update occurs.                                  |
+| `OnGpioEvent`                   | Fires when a GPIO (GPI/GPO) state change is received for any device.        |
 
 ##### Audio Analytics Events
 The SDK also provides specialized event handlers for audio analytics:
@@ -894,6 +972,7 @@ Here’s the enhanced **Handlers** description with method return types included
 | `#ctor`                                | void            | Initializes the handler with references to collections, events, and WAMP client. |
 | `HandleDeviceRegistration`             | void            | Registers a device received from the WAMP client.                   |
 | `RetrieveRegisteredDevices`            | List<Device>    | Fetches registered devices and updates internal collections.         |
+| `HandleDeviceGPIOStatusEvent`          | void            | Routes incoming GPI/GPO change events to the matching device model.  |
 | `SimulateKeyPress(string, string, ...)`| bool            | Simulates a key press on a device.                                   |
 | `InitiateToneTest(string, string)`     | bool            | Starts a tone test on the specified device.                          |
 

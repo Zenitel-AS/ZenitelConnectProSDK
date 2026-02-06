@@ -5,6 +5,7 @@ using SharedComponents.Models.GPIO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Wamp.Client;
 using static Wamp.Client.WampClient;
@@ -63,6 +64,7 @@ namespace ConnectPro.Handlers
         public DeviceHandler(ref Collections collections,
                              ref Events events,
                              ref WampClient wamp,
+                             IGpioTransport gpioTransport,
                              string parentIpAddress = "")
         {
             _collections = collections ?? throw new ArgumentNullException(nameof(collections));
@@ -71,13 +73,16 @@ namespace ConnectPro.Handlers
             ParentIpAddress = parentIpAddress ?? "";
 
             // GPIO transport (one per handler / one per WAMP client)
-            _gpioTransport = new WampGpioTransport(_wamp);
+            _gpioTransport = gpioTransport;
 
             _wamp.OnWampDeviceRegistrationEvent += HandleDeviceRegistration;
             _wamp.OnWampDeviceExtendedStatusEvent += HandleDeviceExtendedStatus;
+            _wamp.OnWampDeviceGPIStatusEventEx += HandleDeviceGPIOStatusEvent;
+            _wamp.OnWampDeviceGPOStatusEventEx += HandleDeviceGPIOStatusEvent;
 
             _events.OnDeviceRetrievalStart += HandleDeviceRetrievalStartEvent;
             _events.OnDeviceStateChange += HandleDeviceStateChange;
+            _events.OnDeviceRetrievalEnd += AttachGPIOListeners;
         }
 
         #endregion
@@ -119,6 +124,15 @@ namespace ConnectPro.Handlers
                     }
                 }
             }
+        }
+
+        private void AttachGPIOListeners(object sender, EventArgs e)
+        {
+            //_events.OnChildLogEntry.Invoke(this, "Attaching GPIO Listeners");
+
+            // Subscribe to global GPI/GPO events (single subscription for all devices)
+            _wamp.TraceDeviceGPIStatusEvent();
+            _wamp.TraceDeviceGPOStatusEvent();
         }
 
         /// <summary>
@@ -178,6 +192,30 @@ namespace ConnectPro.Handlers
                 _events.OnExceptionThrown?.Invoke(this, ex);
             }
         }
+        private void HandleDeviceGPIOStatusEvent(object sender, WampGpioEventArgs wampGpioEvent)
+        {
+            try
+            {
+                var device = _collections.RegisteredDevices.First(d => d.dirno == wampGpioEvent.Dirno);
+                if (device == null)
+                    throw new Exception($"HandleDeviceGPIOStatusEvent exception: No device found for dirno {wampGpioEvent.Dirno}");
+
+                var gpio = device.Gpio.Inputs.FirstOrDefault(input => input.Id == wampGpioEvent.Element.id);
+                if (gpio == null)
+                    gpio = device.Gpio.Outputs.FirstOrDefault(output => output.Id == wampGpioEvent.Element.id);
+
+                if (gpio != null)
+                {
+                    // Invoke GPIO Event here
+                    _events.OnGpioEvent?.Invoke(this, wampGpioEvent);
+                }
+            }
+            catch (Exception Ex)
+            {
+                _events.OnExceptionThrown?.Invoke(this, Ex);
+            }
+
+        }
 
         #endregion
 
@@ -188,52 +226,66 @@ namespace ConnectPro.Handlers
         /// </summary>
         public async Task RetrieveRegisteredDevices()
         {
-            await Task.Run(() =>
+            try
+            {
+                // Guard: avoid concurrent retrievals
+                lock (_lockObj)
+                {
+                    if (IsExecutingDeviceRetrieval)
+                    {
+                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
+                        return;
+                    }
+                    IsExecutingDeviceRetrieval = true;
+                }
+
+                if (!_wamp.IsConnected)
+                {
+                    lock (_lockObj)
+                    {
+                        IsExecutingDeviceRetrieval = false;
+                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
+                    }
+                    return;
+                }
+
+                // 1) Build devices + load GPIOs BEFORE touching RegisteredDevices
+                var loadedDevices = await BuildDevicesWithGpioLoadedAsync().ConfigureAwait(false);
+
+                // 2) Swap list under lock, after disposing old GPIO subscriptions
+                lock (_lockObj)
+                {
+                    if (_collections.RegisteredDevices != null)
+                    {
+                        foreach (var old in _collections.RegisteredDevices)
+                            DetachGpio(old);
+                    }
+
+                    _collections.RegisteredDevices = loadedDevices;
+                    _events.OnQueuesAndCallsSync?.Invoke(this, EventArgs.Empty);
+
+                    if (_collections.RegisteredDevices != null)
+                        DeviceRetrievalTimer?.Stop();
+
+                    _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
+
+                    IsExecutingDeviceRetrieval = false;
+                    _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception ex)
             {
                 lock (_lockObj)
                 {
-                    try
-                    {
-                        if (IsExecutingDeviceRetrieval)
-                        {
-                            _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
-                            return;
-                        }
-
-                        IsExecutingDeviceRetrieval = true;
-
-                        if (_wamp.IsConnected)
-                        {
-                            // Detach GPIO from old instances before replacing the list (prevents leaks).
-                            if (_collections.RegisteredDevices != null)
-                            {
-                                foreach (var old in _collections.RegisteredDevices)
-                                    DetachGpio(old);
-                            }
-
-                            _collections.RegisteredDevices = GetRegisteredDevices().ToList();
-                            _events.OnQueuesAndCallsSync?.Invoke(this, EventArgs.Empty);
-
-                            if (_collections.RegisteredDevices != null)
-                                DeviceRetrievalTimer?.Stop();
-
-                            _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
-                        }
-
-                        IsExecutingDeviceRetrieval = false;
-                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
-                    }
-                    catch (Exception exe)
-                    {
-                        IsExecutingDeviceRetrieval = false;
-
-                        _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
-                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
-                        _events.OnExceptionThrown?.Invoke(this, exe);
-                    }
+                    IsExecutingDeviceRetrieval = false;
+                    _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
                 }
-            }).ConfigureAwait(false);
+
+                _events.OnDebugChanged?.Invoke(this, (ex.Message, ex));
+                _events.OnExceptionThrown?.Invoke(this, ex);
+            }
         }
+
 
         /// <summary>
         /// Retrieves a list of registered devices from the WAMP client.
@@ -251,6 +303,55 @@ namespace ConnectPro.Handlers
 
             return devices;
         }
+
+        private async Task<List<Device>> BuildDevicesWithGpioLoadedAsync()
+        {
+            var devices = ObjectConverter
+                .ConvertSdkDeviceElementList(_wamp.requestRegisteredDevices().ToList())
+                ?.ToList()
+                ?? new List<Device>();
+
+            // Attach runtime GPIO first (starts subscribe + initial refresh)
+            foreach (var d in devices)
+                AttachGpio(d);
+
+            // Await initial refresh for all devices (parallel)
+            var initTasks = new List<Task>();
+
+            foreach (var d in devices)
+            {
+                if (d == null || string.IsNullOrEmpty(d.dirno) || d.Gpio == null)
+                    continue;
+
+                initTasks.Add(AwaitGpioInitWithGuard(d));
+            }
+
+            // Optional: global timeout so retrieval isn't blocked forever
+            // If you don't want timeout, remove WhenAny and just await Task.WhenAll(initTasks).
+            var all = Task.WhenAll(initTasks);
+            var timeout = Task.Delay(TimeSpan.FromSeconds(5)); // tune as you like
+
+            var finished = await Task.WhenAny(all, timeout).ConfigureAwait(false);
+            if (finished != all)
+            {
+                _events.OnDebugChanged?.Invoke(this, ("GPIO preload timeout (some devices did not finish initial snapshot in time).", null));
+                // We proceed anyway: some devices will populate later via SafeInitialRefresh or live events.
+            }
+
+            return devices;
+        }
+        private async Task AwaitGpioInitWithGuard(Device d)
+        {
+            try
+            {
+                await d.Gpio.WhenInitializedAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _events.OnDebugChanged?.Invoke(this, ($"GPIO preload failed for {d.dirno}", ex));
+            }
+        }
+
 
         #endregion
 

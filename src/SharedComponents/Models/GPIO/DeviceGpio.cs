@@ -17,8 +17,8 @@ namespace ConnectPro.Models.GPIO
 
         public IReadOnlyCollection<GpioPoint> Outputs => _gpos.Values;
 
-        private readonly Dictionary<int, GpioPoint> _gpis = new Dictionary<int, GpioPoint>();
-        private readonly Dictionary<int, GpioPoint> _gpos = new Dictionary<int, GpioPoint>();
+        private readonly Dictionary<string, GpioPoint> _gpis = new Dictionary<string, GpioPoint>();
+        private readonly Dictionary<string, GpioPoint> _gpos = new Dictionary<string, GpioPoint>();
 
         private readonly IGpioTransport _transport;
 
@@ -57,13 +57,13 @@ namespace ConnectPro.Models.GPIO
             }
         }
 
-        public Task ActivateAsync(int gpoId, int? timeSeconds, CancellationToken ct)
+        public Task ActivateAsync(string gpoId, int? timeSeconds, CancellationToken ct)
             => SetAsync(gpoId, true, timeSeconds, ct);
 
-        public Task DeactivateAsync(int gpoId, CancellationToken ct)
+        public Task DeactivateAsync(string gpoId, CancellationToken ct)
             => SetAsync(gpoId, false, null, ct);
 
-        private async Task SetAsync(int gpoId, bool active, int? timeSeconds, CancellationToken ct)
+        private async Task SetAsync(string gpoId, bool active, int? timeSeconds, CancellationToken ct)
         {
             await _transport.SetGpoAsync(Dirno, gpoId, active, timeSeconds, ct)
                             .ConfigureAwait(false);

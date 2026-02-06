@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+             x:Class="ZenitelConnectProOperator.Views.CallLogListView"
+             x:DataType="vm:CallLogListViewModel"
+             mc:Ignorable="d">
+
+  <Design.DataContext>
+    <vm:CallLogListViewModel />
+  </Design.DataContext>
+
+  <Border Padding="12" CornerRadius="8" BorderThickness="1">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <TextBlock Text="Call Log" FontSize="16" FontWeight="SemiBold"/>
+
+      <DataGrid Grid.Row="1"
+                ItemsSource="{Binding Log}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                GridLinesVisibility="All"
+                HeadersVisibility="All">
+
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="170"/>
+          <DataGridTextColumn Header="Device" Binding="{Binding DeviceName}" Width="*"/>
+          <DataGridTextColumn Header="From" Binding="{Binding FromDirno}" Width="110"/>
+          <DataGridTextColumn Header="To" Binding="{Binding ToDirno}" Width="110"/>
+          <DataGridTextColumn Header="Answered" Binding="{Binding AnsweredByDirno}" Width="120"/>
+          <DataGridTextColumn Header="State" Binding="{Binding State}" Width="140"/>
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <TextBlock Text="{Binding StatusText}" Opacity="0.75" VerticalAlignment="Center"/>
+        <Button Content="Refresh" Command="{Binding RefreshCommand}"/>
+      </StackPanel>
+
+    </Grid>
+  </Border>
+</UserControl>

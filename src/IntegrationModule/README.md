@@ -415,7 +415,145 @@ CoreHandler.Core.AccessControlHandler.OpenDoor(selectedDevice);
 
 ---
 
-### **F. Event Handling in the SDK**  
+### **F. GPIO (General Purpose Input/Output) Management**
+
+The SDK provides full support for monitoring and controlling **GPIO** (General Purpose Input/Output) lines on Zenitel devices. This includes both **GPI** (inputs, e.g., door sensors, buttons) and **GPO** (outputs, e.g., relays, LEDs).
+
+GPIO state is managed per-device through the `Device.Gpio` property, which exposes a `DeviceGpio` runtime model. This model:
+- Automatically subscribes to real-time GPI/GPO change events via WAMP.
+- Loads an initial snapshot of all GPIO points when the device is retrieved.
+- Provides methods to activate or deactivate GPO outputs.
+
+#### **Architecture Overview**
+
+| Component | Description |
+|---|---|
+| `DeviceGpio` | Per-device runtime model exposing `Inputs`, `Outputs`, and a `Changed` event. |
+| `GpioPoint` | Represents a single GPIO line with `Id`, `Direction`, `State`, `UpdatedUtc`, and `RawState`. |
+| `GpioDirection` | Enum: `Gpi` (input) or `Gpo` (output). |
+| `GpioState` | Enum: `Unknown`, `Inactive` (low), or `Active` (high). |
+| `IGpioTransport` | Transport abstraction implemented by `WampGpioTransport`. |
+| `WampGpioTransport` | WAMP-based implementation that subscribes to `com.zenitel.device.gpi` and `com.zenitel.device.gpo` topics. |
+
+#### **Accessing GPIO State for a Device**
+
+GPIO data is automatically populated when devices are retrieved. Access it through the `Device.Gpio` property:
+
+```csharp
+var device = CoreHandler.Core.Collection.RegisteredDevices
+    .FirstOrDefault(d => d.dirno == "1001");
+
+if (device?.Gpio != null)
+{
+    // Read all GPI (input) points
+    foreach (var input in device.Gpio.Inputs)
+    {
+        Console.WriteLine($"GPI {input.Id}: {input.State}");
+    }
+
+    // Read all GPO (output) points
+    foreach (var output in device.Gpio.Outputs)
+    {
+        Console.WriteLine($"GPO {output.Id}: {output.State}");
+    }
+}
+```
+
+#### **Listening for GPIO Changes**
+
+The SDK provides two levels of GPIO change notifications:
+
+##### **1. Per-Device: `DeviceGpio.Changed` Event**
+
+Subscribe to GPIO changes on a specific device:
+
+```csharp
+device.Gpio.Changed += (sender, args) =>
+{
+    Console.WriteLine($"Device {args.Dirno} - GPIO {args.Point.Id} " +
+                      $"({args.Point.Direction}): {args.Point.State}");
+};
+```
+
+##### **2. Global: `CoreHandler.Core.Events.OnGpioEvent`**
+
+Subscribe to GPIO changes across all devices:
+
+```csharp
+CoreHandler.Core.Events.OnGpioEvent += (sender, gpioEventArgs) =>
+{
+    Console.WriteLine($"GPIO event on device {gpioEventArgs.Dirno}: " +
+                      $"{gpioEventArgs.Element.id} = {gpioEventArgs.Element.state}");
+};
+```
+
+#### **Controlling GPO Outputs (Activate/Deactivate)**
+
+You can activate or deactivate GPO outputs (e.g., door relays) on a device:
+
+```csharp
+// Activate a relay (e.g., "relay1") indefinitely
+await device.Gpio.ActivateAsync("relay1", timeSeconds: null, CancellationToken.None);
+
+// Activate a relay for 5 seconds (auto-deactivates after timeout)
+await device.Gpio.ActivateAsync("relay1", timeSeconds: 5, CancellationToken.None);
+
+// Deactivate a relay manually
+await device.Gpio.DeactivateAsync("relay1", CancellationToken.None);
+```
+
+#### **Refreshing GPIO State**
+
+To force a refresh of the GPIO snapshot for a device:
+
+```csharp
+await device.Gpio.RefreshAsync(CancellationToken.None);
+```
+
+#### **Awaiting Initial GPIO Load**
+
+When devices are first retrieved, GPIO snapshots are loaded asynchronously. To ensure the initial load is complete before reading state:
+
+```csharp
+await device.Gpio.WhenInitializedAsync();
+```
+
+#### **GPIO Models Reference**
+
+##### **GpioPoint**
+
+| Property | Type | Description |
+|---|---|---|
+| `Id` | `string` | Identity of the GPIO line (e.g., `"relay1"`, `"gpi4"`, `"gpo1"`). |
+| `Direction` | `GpioDirection` | Whether this is a `Gpi` (input) or `Gpo` (output). |
+| `State` | `GpioState` | Current state: `Unknown`, `Inactive` (low), or `Active` (high). |
+| `UpdatedUtc` | `DateTimeOffset` | UTC timestamp of the last state update. |
+| `RawState` | `string` | The raw state string from the WAMP payload. |
+
+##### **GpioChangedEventArgs**
+
+| Property | Type | Description |
+|---|---|---|
+| `Dirno` | `string` | Directory number of the device that triggered the change. |
+| `Point` | `GpioPoint` | The GPIO point that changed. |
+
+##### **DeviceGpio**
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `Dirno` | `string` | Directory number of the owning device. |
+| `Inputs` | `IReadOnlyCollection<GpioPoint>` | All known GPI (input) points. |
+| `Outputs` | `IReadOnlyCollection<GpioPoint>` | All known GPO (output) points. |
+| `Changed` | `event EventHandler<GpioChangedEventArgs>` | Fires when any GPIO point changes state. |
+| `ActivateAsync(gpoId, timeSeconds?, ct)` | `Task` | Activates a GPO output. Optional time in seconds. |
+| `DeactivateAsync(gpoId, ct)` | `Task` | Deactivates a GPO output. |
+| `RefreshAsync(ct)` | `Task` | Reloads the full GPIO snapshot from the server. |
+| `WhenInitializedAsync()` | `Task` | Awaitable task that completes when the initial snapshot is loaded. |
+| `Dispose()` | `void` | Unsubscribes from GPIO events for this device. |
+
+---
+
+### **G. Event Handling in the SDK**
 
 The SDK provides a robust **event-driven architecture**, allowing UI and logic components to react dynamically.
 
@@ -443,6 +581,7 @@ The **Zenitel Connect Pro SDK** provides a **modular, event-driven, and centrali
 - **Audio analytics**
 - **Broadcasting**
 - **Access control**
+- **GPIO (General Purpose I/O)** – monitor inputs, control outputs, and receive real-time state changes
 - **Real-time event handling**
 - **Seamless UI integration**
 
@@ -450,6 +589,7 @@ The **Zenitel Connect Pro SDK** provides a **modular, event-driven, and centrali
 ✅ **Collections are auto-populated**; no manual fetching is required.  
 ✅ **Set `OperatorDirNo` after connection & device retrieval, before placing calls or sending messages**.  
 ✅ **Use `OnExceptionThrown` for centralized error handling**.  
+✅ **GPIO state is auto-loaded per device**; use `Device.Gpio` to read inputs/outputs and subscribe to changes.
 
 ---
 
@@ -479,6 +619,7 @@ The SDK provides robust event handling to track changes and updates in real time
 | `OnGroupsMsgUpdate`             | Fires when a group broadcast update is received.                            |
 | `OnDoorOpen`                    | Fires when a door open event is detected.                                   |
 | `OnAudioMessagesChange`         | Fires when an audio message update occurs.                                  |
+| `OnGpioEvent`                   | Fires when a GPIO (GPI/GPO) state change is received for any device.        |
 
 ##### Audio Analytics Events
 The SDK also provides specialized event handlers for audio analytics:
@@ -894,6 +1035,7 @@ Here’s the enhanced **Handlers** description with method return types included
 | `#ctor`                                | void            | Initializes the handler with references to collections, events, and WAMP client. |
 | `HandleDeviceRegistration`             | void            | Registers a device received from the WAMP client.                   |
 | `RetrieveRegisteredDevices`            | List<Device>    | Fetches registered devices and updates internal collections.         |
+| `HandleDeviceGPIOStatusEvent`          | void            | Routes incoming GPI/GPO change events to the matching device model.  |
 | `SimulateKeyPress(string, string, ...)`| bool            | Simulates a key press on a device.                                   |
 | `InitiateToneTest(string, string)`     | bool            | Starts a tone test on the specified device.                          |
 

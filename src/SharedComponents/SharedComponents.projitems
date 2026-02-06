@@ -37,6 +37,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\CallLegElement.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\CallLog.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DTO\CallLogDto.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\CallQueue.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Camera.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Configuration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Device.cs" />

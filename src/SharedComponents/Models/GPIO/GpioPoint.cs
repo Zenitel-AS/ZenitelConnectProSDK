@@ -5,14 +5,14 @@ namespace ConnectPro.Models
 {
     public sealed class GpioPoint
     {
-        public int Id { get; }
+        public string Id { get; }
         public GpioDirection Direction { get; }
-        public GpioState State { get; }
+        public GpioState State { get; set; }
         public DateTimeOffset UpdatedUtc { get; }
         public string RawState { get; }
 
         public GpioPoint(
-            int id,
+            string id,
             GpioDirection direction,
             GpioState state,
             DateTimeOffset updatedUtc,

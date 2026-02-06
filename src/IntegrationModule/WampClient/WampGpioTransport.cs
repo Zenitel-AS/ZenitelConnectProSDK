@@ -47,8 +47,8 @@ public sealed class WampGpioTransport : IGpioTransport
         var list = new List<GpioPoint>();
 
         // Current SDK wrappers are sync and return empty list on null responses.
-        var gpis = _client.requestDevicesGPIs(dirno, "");
-        var gpos = _client.requestDevicesGPOs(dirno, "");
+        var gpis = _client.requestDevicesGPIs(dirno, null);
+        var gpos = _client.requestDevicesGPOs(dirno, null);
 
         MapSnapshot(list, gpis, GpioDirection.Gpi);
         MapSnapshot(list, gpos, GpioDirection.Gpo);
@@ -59,7 +59,7 @@ public sealed class WampGpioTransport : IGpioTransport
     /// <summary>
     /// Sets one GPO output point (activate/deactivate) using the ZCP WAMP endpoint.
     /// </summary>
-    public Task SetGpoAsync(string dirno, int gpoId, bool active, int? timeSeconds, CancellationToken ct)
+    public Task SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(dirno))
             throw new ArgumentException("dirno must be provided.", "dirno");
@@ -67,9 +67,8 @@ public sealed class WampGpioTransport : IGpioTransport
         if (ct.IsCancellationRequested)
             return Task.FromCanceled(ct);
 
-        // Swagger examples typically use string ids like "relay1".
-        // Keep the mapping consistent with existing usage until you confirm alternate naming.
-        string id = "relay" + gpoId;
+        // Use gpoId directly (e.g., "relay1", "gpio2")
+        string id = gpoId;
 
         // ZCP expects operation strings like "set" / "clear".
         string operation = active ? "set" : "clear";
@@ -95,14 +94,14 @@ public sealed class WampGpioTransport : IGpioTransport
         // Register/replace callback first so events arriving immediately can be routed.
         _callbacks[dirno] = onPoint;
 
-        // With the updated WampClient implementation, these subscriptions are stored per-device.
-        // Calling these multiple times for the same dirno should be idempotent (WampClient guards duplicates).
-        _client.TraceDeviceGPIStatusEvent(dirno);
-        _client.TraceDeviceGPOStatusEvent(dirno);
+        // Global subscriptions for GPI/GPO events (idempotent - WampClient guards duplicates).
+        _client.TraceDeviceGPIStatusEvent();
+        _client.TraceDeviceGPOStatusEvent();
     }
 
     /// <summary>
-    /// Removes the callback and unsubscribes the WAMP traces for this device.
+    /// Removes the callback for this device. The global WAMP subscription remains active
+    /// for other devices that may still be subscribed.
     /// </summary>
     public void DisposeFor(string dirno)
     {
@@ -111,10 +110,6 @@ public sealed class WampGpioTransport : IGpioTransport
 
         Action<GpioPoint> _;
         _callbacks.TryRemove(dirno, out _);
-
-        // Per-device dispose (requires the updated WampClient partials).
-        _client.TraceDeviceGPIStatusEventDispose(dirno);
-        _client.TraceDeviceGPOStatusEventDispose(dirno);
     }
 
     // ---------------- EventEx handlers (include dirno) ----------------
@@ -145,7 +140,7 @@ public sealed class WampGpioTransport : IGpioTransport
             return;
 
         var point = new GpioPoint(
-            ParseIndex(element.id),
+            element.id,
             direction,
             ParseState(element),
             DateTimeOffset.UtcNow,
@@ -173,9 +168,35 @@ public sealed class WampGpioTransport : IGpioTransport
 
     private static GpioState ParseState(wamp_device_gpio_element e)
     {
-        // Current SDK convention: "1" == active, anything else == inactive.
-        return (e.state == "1") ? GpioState.Active : GpioState.Inactive;
+        if (e == null) return GpioState.Inactive;
+
+        // Primary: use "state" field when present ("low"/"high")
+        if (!string.IsNullOrEmpty(e.state))
+        {
+            if (e.state.Equals("high", StringComparison.OrdinalIgnoreCase))
+                return GpioState.Active;
+
+            if (e.state.Equals("low", StringComparison.OrdinalIgnoreCase))
+                return GpioState.Inactive;
+
+            // fallback: some systems use "1"/"0"
+            if (e.state == "1") return GpioState.Active;
+            if (e.state == "0") return GpioState.Inactive;
+        }
+
+        // Fallback: GPO events use "operation" ("set"/"clear") instead of "state"
+        if (!string.IsNullOrEmpty(e.operation))
+        {
+            if (e.operation.Equals("set", StringComparison.OrdinalIgnoreCase))
+                return GpioState.Active;
+
+            if (e.operation.Equals("clear", StringComparison.OrdinalIgnoreCase))
+                return GpioState.Inactive;
+        }
+
+        return GpioState.Inactive;
     }
+
 
     private static void MapSnapshot(List<GpioPoint> list, IEnumerable<wamp_device_gpio_element> elements, GpioDirection direction)
     {
@@ -188,7 +209,7 @@ public sealed class WampGpioTransport : IGpioTransport
                 continue;
 
             list.Add(new GpioPoint(
-                ParseIndex(e.id),
+                e.id,
                 direction,
                 ParseState(e),
                 DateTimeOffset.UtcNow,

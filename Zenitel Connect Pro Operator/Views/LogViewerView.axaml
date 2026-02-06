@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+             x:Class="ZenitelConnectProOperator.Views.LogViewerView"
+             x:DataType="vm:LogViewerViewModel"
+             mc:Ignorable="d">
+
+  <Design.DataContext>
+    <vm:LogViewerViewModel />
+  </Design.DataContext>
+
+  <Border Padding="12" CornerRadius="8" BorderThickness="1">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+      <TextBlock Text="System Log" FontSize="16" FontWeight="SemiBold"/>
+
+      <!-- Column headers -->
+      <Grid Grid.Row="1" ColumnDefinitions="120,*" Margin="0,8,0,4">
+        <TextBlock Grid.Column="0" Text="Time" FontWeight="SemiBold" FontSize="12" Opacity="0.6"/>
+        <TextBlock Grid.Column="1" Text="Message" FontWeight="SemiBold" FontSize="12" Opacity="0.6" Margin="8,0,0,0"/>
+      </Grid>
+
+      <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding LogEntries}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LogEntryViewModel">
+              <Border Padding="0,4" BorderBrush="#19000000" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Grid.Column="0" Text="{Binding FormattedTimestamp}" FontSize="12" Opacity="0.75"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Message}" FontSize="12" TextWrapping="Wrap" Margin="8,0,0,0"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+        <TextBlock Text="{Binding LogEntries.Count}" Opacity="0.75" VerticalAlignment="Center"/>
+        <Button Content="Clear" Command="{Binding ClearCommand}"/>
+      </StackPanel>
+
+    </Grid>
+  </Border>
+</UserControl>

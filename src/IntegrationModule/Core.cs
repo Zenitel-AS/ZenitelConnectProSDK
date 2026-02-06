@@ -1,6 +1,9 @@
 ﻿using ConnectPro.Handlers;
+using ConnectPro.Models;
 using System;
+using System.Net.NetworkInformation;
 using Wamp.Client;
+using Zenitel.IntegrationModule.REST;
 
 namespace ConnectPro
 {
@@ -15,6 +18,7 @@ namespace ConnectPro
         private Collections _collection = new Collections();
         private Events _events = new Events();
         private WampClient _wamp = new WampClient();
+        private RestClient _rest = new RestClient();
 
         #endregion
 
@@ -32,7 +36,11 @@ namespace ConnectPro
         public Configuration Configuration
         {
             get => _configuration;
-            set => _configuration = value;
+            set
+            {
+                _configuration = value;
+                SyncConfiguration();
+            }
         }
 
         /// <summary>
@@ -60,6 +68,15 @@ namespace ConnectPro
         {
             get => _wamp;
             set => _wamp = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the REST client for REST API communication.
+        /// </summary>
+        public RestClient Rest
+        {
+            get => _rest;
+            set => _rest = value;
         }
 
         /// <summary>
@@ -119,6 +136,8 @@ namespace ConnectPro
             try
             {
                 Events.OnConnectionChanged += HandleConnectionChanged;
+                // Initialize configuration synchronization
+                SyncConfiguration();
             }
             catch (Exception exe)
             {
@@ -129,6 +148,32 @@ namespace ConnectPro
         #endregion
 
         #region Methods
+
+        /// <summary>
+        /// Synchronizes the configuration between Core and both WampClient and RestClient.
+        /// This ensures that changes to server address, username, or password are reflected in both clients.
+        /// </summary>
+        private void SyncConfiguration()
+        {
+            if (_configuration == null)
+                return;
+
+            // Synchronize WampClient
+            if (_wamp != null)
+            {
+                _wamp.WampServerAddr = _configuration.ServerAddr;
+                _wamp.UserName = _configuration.UserName;
+                _wamp.Password = _configuration.Password;
+            }
+
+            // Synchronize RestClient
+            if (_rest != null)
+            {
+                _rest.ServerAddress = _configuration.ServerAddr;
+                _rest.UserName = _configuration.UserName;
+                _rest.Password = _configuration.Password;
+            }
+        }
 
         /// <summary>
         /// Starts the core components of the application.
@@ -148,12 +193,20 @@ namespace ConnectPro
              * 
              */
 
+            // Ensure RestClient is initialized and configured
+            if (_rest == null)
+            {
+                _rest = new RestClient();
+            }
+            SyncConfiguration();
+
             SystemMonitor = new SystemMonitor(Events, Configuration, ref _wamp);
-            DeviceHandler = new DeviceHandler(ref _collection, ref _events, ref _wamp, Configuration.ServerAddr);
+            // Use hybrid transport: REST for initial snapshots and WAMP for realtime events
+            DeviceHandler = new DeviceHandler(ref _collection, ref _events, ref _wamp, new HybridGpioTransport(this, _wamp), Configuration.ServerAddr);
             AudioEventHandler = new AudioEventHandler(ref _events, ref _wamp, Configuration.ServerAddr);
             // DatabaseHandler = new DatabaseHandler(Collection, Events);
             CallHandler = new CallHandler(ref _collection, ref _events, ref _wamp, ref _configuration, Configuration.ServerAddr);
-            ConnectionHandler = new ConnectionHandler(ref _events, ref _wamp, ref _configuration, Configuration.ServerAddr);
+            ConnectionHandler = new ConnectionHandler(ref _events, ref _wamp, ref _rest, ref _configuration, Configuration.ServerAddr);
             AccessControlHandler = new AccessControlHandler(ref _events, ref _wamp, ref _configuration);
             BroadcastingHandler = new BroadcastingHandler(ref _collection, ref _events, ref _wamp, Configuration.ServerAddr);
             Log = new Debug.Log(Collection, Events);
@@ -232,6 +285,7 @@ namespace ConnectPro
                 Log = null;
                 ConnectionHandler = null;
                 _wamp = null;
+                _rest = null;
             }
 
             _disposed = true;

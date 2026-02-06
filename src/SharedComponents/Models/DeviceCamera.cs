@@ -29,7 +29,7 @@ namespace ConnectPro.Models
         /// <summary>
         /// Gets or sets the camera associated with this relationship.
         /// </summary>
-        public virtual ICamera Camera { get; set; }
+        public virtual Camera Camera { get; set; }
 
         #endregion
 

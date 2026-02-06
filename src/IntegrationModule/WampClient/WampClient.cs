@@ -1,17 +1,19 @@
-﻿#pragma warning disable CS1591
+#pragma warning disable CS1591
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Security;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using WampSharp.Core.Listener;
 using WampSharp.V2;
 using WampSharp.V2.Client;
+using WampSharp.V2.Core.Contracts;
 using WampSharp.V2.Fluent;
 using WampSharp.V2.Realm;
-using System.Security.Authentication;
 
 
 namespace Wamp.Client
@@ -780,64 +782,212 @@ namespace Wamp.Client
 
         /***********************************************************************************************************************/
         private object GET_calls_queued(string queueDirNo)
-        /***********************************************************************************************************************/
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (_wampRealmProxy == null || !IsConnected)
+                {
+                    OnChildLogString?.Invoke(this, "GET_calls_queued: not connected (realm proxy not ready).");
+                    return null;
+                }
 
-                // try call function
-                return svc.GET_call_queues(queueDirNo);
+                var services = _wampRealmProxy.Services;
+                if (services == null)
+                {
+                    OnChildLogString?.Invoke(this, "GET_calls_queued: realm proxy services not ready.");
+                    return null;
+                }
+
+                var svc = services.GetCalleeProxy<IConnectWampServices>();
+                if (svc == null)
+                {
+                    OnChildLogString?.Invoke(this, "GET_calls_queued: callee proxy unavailable.");
+                    return null;
+                }
+
+                // IMPORTANT: omit optional param if empty
+                return string.IsNullOrWhiteSpace(queueDirNo)
+                    ? svc.GET_call_queues()
+                    : svc.GET_call_queues(queueDirNo);
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_calls_queue: " + ex.ToString());
+                OnChildLogString?.Invoke(this, "Exception in GET_calls_queued: " + ex);
                 return null;
             }
         }
-
 
         /***********************************************************************************************************************/
         private object GET_devices_gpos(string device_id, string id)
-        /***********************************************************************************************************************/
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                // The backend expects a payload with a 'dirno' key (not 'device_id').
+                // Follow the same pattern as GET_devices_gpis: provide the payload as both
+                // the single positional arg and as kwargs.
+                var dirno = (device_id ?? string.Empty).Trim();
 
-                // try call function
-                return svc.GET_devices_gpos(device_id, id);
+                var payload = new Dictionary<string, object>
+                {
+                    ["dirno"] = dirno
+                };
 
+                if (!string.IsNullOrWhiteSpace(id) && id != "*" && !id.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    payload["id"] = id;
+                }
+
+                var rpcCallback = new RPCCallback();
+
+                _wampRealmProxy.RpcCatalog.Invoke(
+                    rpcCallback,
+                    new CallOptions(),
+                    WampClient.GetWampDevicesGpos,
+                    new object[] { payload },     // args[0] = object
+                    payload                        // kwargs = same object
+                );
+
+                // wait for response (same as your working method)
+                bool cont = true;
+                int loopCount = 0;
+                const int sleepTime = 10;
+
+                while (cont)
+                {
+                    Thread.Sleep(sleepTime);
+
+                    if (rpcCallback.RespRecv) cont = false;
+                    else if (++loopCount > 30) cont = false;
+                }
+
+                if (!rpcCallback.RespRecv)
+                {
+                    OnChildLogString?.Invoke(this, "GET_devices_gpos: No response from WAMP.");
+                    return null;
+                }
+
+                if (!rpcCallback.CompletedSuccessfully)
+                {
+                    OnChildLogString?.Invoke(this, "GET_devices_gpos failed: " + rpcCallback.CompletionText);
+                    return null;
+                }
+
+                // ✅ GET returns data
+                return rpcCallback;
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpos: " + ex.ToString());
+                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpos: " + ex);
                 return null;
             }
         }
 
 
+
+        private static string NormalizeDeviceId(string deviceId)
+        {
+            if (string.IsNullOrWhiteSpace(deviceId))
+                return deviceId;
+
+            // already in the expected form
+            if (deviceId.StartsWith("device;", StringComparison.OrdinalIgnoreCase))
+                return deviceId;
+
+            // already has selector key, add the device; prefix
+            if (deviceId.Contains("="))
+                return "device;" + deviceId;
+
+            // heuristic: MAC vs dirno
+            if (deviceId.Contains(":") || deviceId.Contains("-"))
+                return "device;mac_address=" + deviceId;
+
+            return "device;dirno=" + deviceId;
+        }
+
+
+
         /***********************************************************************************************************************/
-        private object GET_devices_gpis(string device_id, string id)
-        /***********************************************************************************************************************/
+        private object GET_devices_gpis(string device_id_or_dirno, string id)
         {
             try
             {
-                // get service
                 var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                var response = svc.GET_devices_gpis(device_id_or_dirno, id);
 
-                // try call function
-                return svc.GET_devices_gpis(device_id, id);
+                var dirno = (device_id_or_dirno ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(dirno))
+                {
+                    OnChildLogString?.Invoke(this, "GET_devices_gpis: missing dirno");
+                    return null;
+                }
 
+                string outputId = (id ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(outputId) ||
+                    outputId == "*" ||
+                    outputId.Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    outputId = null;
+                }
+
+                var payload = new Dictionary<string, object>
+                {
+                    ["dirno"] = dirno
+                };
+
+                if (outputId != null)
+                    payload["id"] = outputId;
+
+                var rpcCallback = new RPCCallback();
+
+                _wampRealmProxy.RpcCatalog.Invoke(
+                    rpcCallback,
+                    new WampSharp.V2.Core.Contracts.CallOptions(),
+                    "com.zenitel.devices.device.gpis",
+                    new object[] { payload },     // args[0] = object
+                    payload                        // kwargs = same object
+                );
+
+                bool cont = true;
+                int loopCount = 0;
+                const int sleepTime = 10;
+
+                while (cont)
+                {
+                    Thread.Sleep(sleepTime);
+
+                    if (rpcCallback.RespRecv)
+                    {
+                        cont = false;
+                    }
+                    else
+                    {
+                        loopCount++;
+                        if (loopCount > 30)
+                            cont = false;
+                    }
+                }
+
+                if (!rpcCallback.RespRecv)
+                {
+                    OnChildLogString?.Invoke(this, "GET_devices_gpis: No response from WAMP.");
+                    return null;
+                }
+
+                if (!rpcCallback.CompletedSuccessfully)
+                {
+                    OnChildLogString?.Invoke(this, "GET_devices_gpis failed: " + rpcCallback.CompletionText);
+                    return null;
+                }
+
+                return rpcCallback;
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpis: " + ex.ToString());
+                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpis: " + ex);
                 return null;
             }
         }
+
 
         /***********************************************************************************************************************/
         private object GET_PlatformVersion()

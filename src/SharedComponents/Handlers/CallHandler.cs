@@ -678,6 +678,16 @@ namespace ConnectPro.Handlers
             return queues;
         }
 
+        public List<CallQueue> GetAllDefinedQueues(string queueDirno = "")
+        {
+            List<CallQueue> queues = new List<CallQueue>();
+            foreach (var call_queue_element in _wamp.requestQueuedCalls(queueDirno))
+            {
+                queues.Add(new CallQueue(call_queue_element));
+            }
+            return queues;
+        }
+
         #endregion
 
         #region Call Deletion Methods
@@ -685,7 +695,7 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Deletes all active and queued calls.
         /// </summary>
-        
+
         public async Task DeleteAllCall()
         {
 

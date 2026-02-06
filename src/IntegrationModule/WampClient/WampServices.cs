@@ -21,6 +21,9 @@ namespace Wamp.Client
         object GET_call_legs(string from_dirno, string to_dirno, string dirno, string leg_id, string call_id, string state, string leg_role);
 
         [WampProcedure(WampClient.GetWampQueues)]
+        object GET_call_queues();
+
+        [WampProcedure(WampClient.GetWampQueues)]
         object GET_call_queues(string queue_dirno);
 
         [WampProcedure(WampClient.GetWampDevicesGpos)]

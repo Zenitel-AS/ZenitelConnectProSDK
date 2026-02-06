@@ -1,0 +1,289 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+			 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+			 xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+			 xmlns:views="clr-namespace:ZenitelConnectProOperator.Views"
+			 xmlns:conv="clr-namespace:ZenitelConnectProOperator.Converters"
+			 x:Class="ZenitelConnectProOperator.Views.DeviceListView"
+			 x:DataType="vm:DeviceListViewModel"
+			 mc:Ignorable="d">
+
+	<UserControl.Resources>
+		<conv:BoolInverterConverter x:Key="BoolNot" />
+		<conv:LoadedButEmptyToVisibleConverter x:Key="LoadedButEmptyToVisible" />
+		<conv:CallStateToColorConverter x:Key="CallStateToColor" />
+		<conv:CallStateToLabelConverter x:Key="CallStateToLabel" />
+		<conv:CallStateToButtonTextConverter x:Key="CallStateToButtonText" />
+		<conv:GpioStateToColorConverter x:Key="GpioStateToColor" />
+		<conv:GpioStateToOpacityConverter x:Key="GpioStateToOpacity" />
+		<conv:GpioDirectionToColorConverter x:Key="GpioDirectionToColor" />
+		<conv:GpioDirectionIsInputConverter x:Key="GpioDirectionIsInput" />
+		<conv:GpioDirectionIsOutputConverter x:Key="GpioDirectionIsOutput" />
+		<conv:RelativeTimeConverter x:Key="RelativeTime" />
+	</UserControl.Resources>
+
+	<UserControl.Styles>
+		<!-- Compact device row style -->
+		<Style Selector="Border.deviceRow">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="Padding" Value="12,8"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Margin" Value="0,2"/>
+		</Style>
+		<Style Selector="Border.deviceRow:pointerover">
+			<Setter Property="Background" Value="#1A000000"/>
+		</Style>
+
+		<!-- GPIO indicator dot -->
+		<Style Selector="Ellipse.gpioDot">
+			<Setter Property="Width" Value="8"/>
+			<Setter Property="Height" Value="8"/>
+			<Setter Property="Margin" Value="1,0"/>
+		</Style>
+
+		<!-- Status indicator dot -->
+		<Style Selector="Ellipse.statusDot">
+			<Setter Property="Width" Value="10"/>
+			<Setter Property="Height" Value="10"/>
+		</Style>
+
+		<!-- Compact call button -->
+		<Style Selector="Button.callButton">
+			<Setter Property="MinWidth" Value="60"/>
+			<Setter Property="Padding" Value="10,4"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="FontSize" Value="12"/>
+		</Style>
+
+		<!-- GPIO detail popup styling -->
+		<Style Selector="Border.gpioPopup">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#E5E7EB"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="10"/>
+		</Style>
+	</UserControl.Styles>
+
+	<Design.DataContext>
+		<vm:DeviceListViewModel />
+	</Design.DataContext>
+
+	<Border Padding="16" CornerRadius="10" BorderThickness="1">
+		<Grid RowDefinitions="Auto,Auto,*">
+
+			<!-- Header -->
+			<Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+				<TextBlock Text="Device List"
+						   FontSize="18"
+						   FontWeight="SemiBold"/>
+
+				<!-- Legend -->
+				<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" Opacity="0.7">
+					<StackPanel Orientation="Horizontal" Spacing="4">
+						<Ellipse Width="8" Height="8" Fill="#22C55E"/>
+						<TextBlock Text="Reachable" FontSize="11"/>
+					</StackPanel>
+					<StackPanel Orientation="Horizontal" Spacing="4">
+						<Ellipse Width="8" Height="8" Fill="#3B82F6"/>
+						<TextBlock Text="In Call" FontSize="11"/>
+					</StackPanel>
+					<StackPanel Orientation="Horizontal" Spacing="4">
+						<Ellipse Width="8" Height="8" Fill="#EF4444"/>
+						<TextBlock Text="Fault" FontSize="11"/>
+					</StackPanel>
+				</StackPanel>
+			</Grid>
+
+			<!-- Column headers -->
+			<Border Grid.Row="1"
+					Padding="12,6"
+					CornerRadius="4"
+					Background="Transparent"
+					Margin="0,0,0,4">
+				<Grid ColumnDefinitions="24,80,*,180,70">
+					<TextBlock Grid.Column="1" Text="Dir No" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+					<TextBlock Grid.Column="2" Text="Name" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+					<TextBlock Grid.Column="3" Text="GPIO" FontWeight="SemiBold" FontSize="12" Opacity="0.8" HorizontalAlignment="Center"/>
+					<TextBlock Grid.Column="4" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+				</Grid>
+			</Border>
+
+			<!-- Device list -->
+			<ScrollViewer Grid.Row="2">
+				<ItemsControl ItemsSource="{Binding Devices}">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<StackPanel Spacing="2"/>
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="vm:DeviceViewModel">
+							<Border Classes="deviceRow">
+								<Grid ColumnDefinitions="24,80,*,180,70">
+
+									<!-- Status dot -->
+									<Ellipse Classes="statusDot"
+											 Fill="{Binding Device.CallState, Converter={StaticResource CallStateToColor}}"
+											 ToolTip.Tip="{Binding Device.CallState, Converter={StaticResource CallStateToLabel}}"
+											 VerticalAlignment="Center"
+											 HorizontalAlignment="Center"/>
+
+									<!-- Directory Number -->
+									<TextBlock Grid.Column="1"
+											   Text="{Binding Device.dirno}"
+											   FontWeight="SemiBold"
+											   VerticalAlignment="Center"/>
+
+									<!-- Device Name -->
+									<TextBlock Grid.Column="2"
+											   Text="{Binding Device.name}"
+											   VerticalAlignment="Center"
+											   TextTrimming="CharacterEllipsis"
+											   Opacity="0.9"/>
+
+									<!-- GPIO Summary Bar -->
+									<Grid Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Center">
+										<StackPanel Orientation="Horizontal" 
+													Spacing="8"
+													IsVisible="{Binding HasGpios}">
+
+											<!-- GPI indicators -->
+																								<StackPanel Orientation="Horizontal" Spacing="2">
+																									<TextBlock Text="GPI" FontSize="10" Opacity="0.85" VerticalAlignment="Center" Margin="0,0,4,0"/>
+												<ItemsControl ItemsSource="{Binding Gpios}">
+													<ItemsControl.ItemsPanel>
+														<ItemsPanelTemplate>
+															<StackPanel Orientation="Horizontal" Spacing="2"/>
+														</ItemsPanelTemplate>
+													</ItemsControl.ItemsPanel>
+															<ItemsControl.ItemTemplate>
+																<DataTemplate x:DataType="vm:GpioPointViewModel">
+																																				<Ellipse Classes="gpioDot"
+																																														 IsVisible="{Binding Direction, Converter={StaticResource GpioDirectionIsInput}}"
+																											 Fill="{Binding Direction, Converter={StaticResource GpioDirectionToColor}}"
+																											 Opacity="{Binding State, Converter={StaticResource GpioStateToOpacity}}"
+																											 ToolTip.Tip="{Binding Id}"/>
+																</DataTemplate>
+															</ItemsControl.ItemTemplate>
+														</ItemsControl>
+													</StackPanel>
+
+													<!-- Separator -->
+																								<Border Width="1" Height="12" Background="#9CA3AF" IsVisible="{Binding HasGpios}"/>
+
+											<!-- GPO indicators -->
+																								<StackPanel Orientation="Horizontal" Spacing="2">
+																									<TextBlock Text="GPO" FontSize="10" Opacity="0.85" VerticalAlignment="Center" Margin="0,0,4,0"/>
+												<ItemsControl ItemsSource="{Binding Gpios}">
+													<ItemsControl.ItemsPanel>
+														<ItemsPanelTemplate>
+															<StackPanel Orientation="Horizontal" Spacing="2"/>
+														</ItemsPanelTemplate>
+													</ItemsControl.ItemsPanel>
+													<ItemsControl.ItemTemplate>
+														<DataTemplate x:DataType="vm:GpioPointViewModel">
+																																		<Ellipse Classes="gpioDot"
+																																												 IsVisible="{Binding Direction, Converter={StaticResource GpioDirectionIsOutput}}"
+																									 Fill="{Binding Direction, Converter={StaticResource GpioDirectionToColor}}"
+																									 Opacity="{Binding State, Converter={StaticResource GpioStateToOpacity}}"
+																									 ToolTip.Tip="{Binding Id}"/>
+														</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+											</StackPanel>
+
+											<!-- Active indicator (lightning bolt) -->
+											<TextBlock Text="⚡" 
+													   FontSize="12"
+													   Foreground="#FBBF24"
+													   IsVisible="{Binding HasActiveGpio}"
+													   ToolTip.Tip="Active GPIO detected"
+													   VerticalAlignment="Center"/>
+										</StackPanel>
+
+										<!-- No GPIO message -->
+										<TextBlock Text="—"
+												   Opacity="0.4"
+												   IsVisible="{Binding HasGpios, Converter={StaticResource BoolNot}}"
+												   HorizontalAlignment="Center"/>
+									</Grid>
+
+									<!-- Call button -->
+									<Button Grid.Column="4"
+											Classes="callButton"
+											Content="{Binding Device.CallState, Converter={StaticResource CallStateToButtonText}}"
+											HorizontalAlignment="Right"
+											Command="{Binding ToggleCallCommand, RelativeSource={RelativeSource AncestorType=views:DeviceListView}}"
+											CommandParameter="{Binding Device}"/>
+								</Grid>
+
+								<!-- GPIO Detail Popup on hover -->
+								<ToolTip.Tip>
+									<Border Classes="gpioPopup" MaxWidth="300">
+										<StackPanel Spacing="8">
+											<!-- Device header -->
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<TextBlock Text="{Binding Device.dirno}" FontWeight="Bold"/>
+												<TextBlock Text="{Binding Device.name}" Opacity="0.8"/>
+											</StackPanel>
+
+											<Border Height="1" Background="#374151"/>
+
+											<!-- GPIO status if loaded -->
+											<TextBlock Text="GPIO snapshot not loaded yet."
+													   Opacity="0.6"
+													   FontSize="11"
+													   IsVisible="{Binding GpiosLoaded, Converter={StaticResource BoolNot}}"/>
+
+											<!-- GPIO detail list -->
+											<ItemsControl ItemsSource="{Binding Gpios}" IsVisible="{Binding GpiosLoaded}">
+												<ItemsControl.ItemsPanel>
+													<ItemsPanelTemplate>
+														<StackPanel Spacing="4"/>
+													</ItemsPanelTemplate>
+												</ItemsControl.ItemsPanel>
+												<ItemsControl.ItemTemplate>
+													<DataTemplate x:DataType="vm:GpioPointViewModel">
+																													<Grid ColumnDefinitions="50,Auto,*,Auto">
+															<TextBlock Text="{Binding Direction}" FontSize="11" Opacity="0.7"/>
+															<TextBlock Grid.Column="1" Text="{Binding Id}" FontWeight="SemiBold" FontSize="11" Margin="0,0,8,0"/>
+															<Ellipse Grid.Column="2"
+																	 Width="8" Height="8"
+																	 Fill="{Binding Direction, Converter={StaticResource GpioDirectionToColor}}"
+																	 Opacity="{Binding State, Converter={StaticResource GpioStateToOpacity}}"
+																	 HorizontalAlignment="Left"
+																	 VerticalAlignment="Center"/>
+															<TextBlock Grid.Column="3" 
+																	   Text="{Binding UpdatedUtc, Converter={StaticResource RelativeTime}}"
+																	   FontSize="10"
+																	   Opacity="0.5"/>
+														</Grid>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+
+											<!-- Summary counts -->
+											<StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasGpios}">
+												<TextBlock FontSize="11" Opacity="0.6">
+													<Run Text="Active: "/>
+													<Run Text="{Binding ActiveGpioTotalCount}" FontWeight="SemiBold"/>
+													<Run Text=" / "/>
+													<Run Text="{Binding GpioCount}"/>
+												</TextBlock>
+											</StackPanel>
+										</StackPanel>
+									</Border>
+								</ToolTip.Tip>
+							</Border>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+
+				</ItemsControl>
+			</ScrollViewer>
+
+		</Grid>
+	</Border>
+</UserControl>

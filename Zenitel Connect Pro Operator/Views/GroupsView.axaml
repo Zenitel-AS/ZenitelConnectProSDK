@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+             x:Class="ZenitelConnectProOperator.Views.GroupsView"
+             x:DataType="vm:GroupsViewModel"
+             xmlns:views="clr-namespace:ZenitelConnectProOperator.Views"
+             mc:Ignorable="d">
+
+  <Design.DataContext>
+    <vm:GroupsViewModel />
+  </Design.DataContext>
+
+  <Border Padding="12" CornerRadius="8" BorderThickness="1">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <TextBlock Text="Groups" FontSize="16" FontWeight="SemiBold"/>
+
+      <DataGrid Grid.Row="1"
+                ItemsSource="{Binding Groups}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                GridLinesVisibility="All">
+
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="DIRNO" Binding="{Binding DirNo}" Width="120"/>
+          <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="*"/>
+          <DataGridTextColumn Header="Message" Binding="{Binding BroadcastedMessageName}" Width="220"/>
+
+          <DataGridTemplateColumn Header="Actions" Width="240">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Call"
+                        Command="{Binding InitiateGroupCallCommand, RelativeSource={RelativeSource AncestorType=views:GroupsView}}"
+                        CommandParameter="{Binding}"
+                        IsEnabled="{Binding CanInitiateCall}"/>
+
+                <Button Content="Messages"
+                        Command="{Binding OpenMessagesCommand, RelativeSource={RelativeSource AncestorType=views:GroupsView}}"
+                        CommandParameter="{Binding}"/>
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Spacing="8">
+        <Button Content="M (press)" Command="{Binding MPressCommand}"/>
+        <Button Content="M (release)" Command="{Binding MReleaseCommand}"/>
+        <Button Content="Refresh" Command="{Binding RefreshCommand}" HorizontalAlignment="Right"/>
+      </StackPanel>
+
+    </Grid>
+  </Border>
+</UserControl>

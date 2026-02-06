@@ -81,6 +81,7 @@ The **WampClient** is a critical communication layer built using the **WampSharp
     - Call events and synchronization.
     - Audio analytics and event processing.
     - Broadcasting and access control.
+    - GPIO (GPI/GPO) monitoring and control.
 
 ---
 
@@ -102,6 +103,11 @@ The **Integration Modules** are backend libraries. These modules implement the s
 
 5. **Broadcasting**:
    - Enables broadcasting of audio messages and announcements to groups or devices.
+
+6. **GPIO Management**:
+   - Monitor GPI (input) and GPO (output) states on devices in real time.
+   - Control GPO outputs (e.g., activate/deactivate relays) via the `Device.Gpio` model.
+   - Receive real-time GPIO state change events through `DeviceGpio.Changed` or `CoreHandler.Core.Events.OnGpioEvent`.
 
 ---
 

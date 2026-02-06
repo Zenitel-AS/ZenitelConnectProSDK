@@ -1,6 +1,7 @@
 ﻿using ConnectPro.Models;
 using ConnectPro.Models.AudioAnalytics;
 using System;
+using Wamp.Client;
 
 namespace ConnectPro
 {
@@ -62,6 +63,12 @@ namespace ConnectPro
         /// Occurs when a Device <seealso cref="Enums.CallState"/> CallState undergoes changes.
         /// </summary>
         public EventHandler<Device> OnDeviceCallStateChange { get; set; }
+
+        /// <summary>
+        /// Occurs when a GPIO event is received for a device.
+        /// The event args are of type WampGpioEventArgs and contain the dirno and gpio element.
+        /// </summary>
+        public EventHandler<WampGpioEventArgs> OnGpioEvent { get; set; }
 
         #endregion
 

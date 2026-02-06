@@ -21,7 +21,7 @@ namespace SharedComponents.Models.GPIO
         /// Sets a GPO output state. "active=true" activates, "false" deactivates.
         /// timeSeconds is optional (when supported by backend).
         /// </summary>
-        Task SetGpoAsync(string dirno, int gpoId, bool active, int? timeSeconds, CancellationToken ct);
+        Task SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct);
 
         /// <summary>
         /// Ensures the transport is subscribed to GPIO change events for the specified device.

@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+        x:Class="ZenitelConnectProOperator.Views.GroupMessagesWindow"
+        x:DataType="vm:GroupMessagesViewModel"
+        xmlns:views="clr-namespace:ZenitelConnectProOperator.Views"
+        mc:Ignorable="d"
+        Width="760"
+        Height="520"
+        Title="Group Messages">
+
+  <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto">
+
+    <StackPanel>
+      <TextBlock Text="{Binding GroupName}" FontSize="16" FontWeight="SemiBold"/>
+      <TextBlock Text="{Binding GroupDirNo}" Opacity="0.75"/>
+    </StackPanel>
+
+    <Border Grid.Row="1" Padding="10" CornerRadius="8" BorderThickness="1">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <CheckBox Content="No repeat" IsChecked="{Binding NoRepeat}"/>
+        <CheckBox Content="Infinite" IsChecked="{Binding InfiniteRepeat}"/>
+        <CheckBox Content="Limited" IsChecked="{Binding IsLimitedRepeat}"/>
+        <NumericUpDown Width="90"
+                       Minimum="1"
+                       Maximum="999"
+                       Value="{Binding RepeatNumber}"
+                       IsEnabled="{Binding IsLimitedRepeat}"/>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="2" Padding="10" CornerRadius="8" BorderThickness="1">
+      <DataGrid ItemsSource="{Binding AudioMessages}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                GridLinesVisibility="All">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="*"/>
+          <DataGridTextColumn Header="DIRNO" Binding="{Binding Dirno}" Width="120"/>
+
+          <DataGridTemplateColumn Header="Action" Width="120">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Button Content="{Binding PlayButtonText}"
+                        Command="{Binding TogglePlayCommand, RelativeSource={RelativeSource AncestorType=views:GroupMessagesWindow}}"
+                        CommandParameter="{Binding}"/>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Close" Command="{Binding CloseCommand}"/>
+    </StackPanel>
+  </Grid>
+</Window>

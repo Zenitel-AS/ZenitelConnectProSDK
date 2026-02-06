@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:ZenitelConnectProOperator.Views"
+             x:Class="ZenitelConnectProOperator.Views.MainView"
+             mc:Ignorable="d"
+             x:DataType="vm:MainViewModel"
+             xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels">
+
+  <UserControl.Styles>
+    <!-- Hover background like WPF template triggers -->
+    <Style Selector="Button.headerIcon">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="5"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Width" Value="60"/>
+      <Setter Property="Height" Value="64"/>
+    </Style>
+
+    <Style Selector="Button.headerIcon:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Gray"/>
+    </Style>
+
+    <!-- Optional: make read-only TextBox transparent (if you keep TextBox) -->
+    <Style Selector="TextBox[IsReadOnly=true]">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
+    <!-- Header -->
+    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,8,0,8">
+
+      <!-- Left logo -->
+      <Image DockPanel.Dock="Left"
+             Source="avares://Zenitel Connect Pro Operator/Assets/ZenitelLogo.png"
+             Stretch="Uniform"
+             Height="32"
+             Width="148"
+             Margin="15,0,0,0"/>
+
+      <!-- Right operator + connection -->
+      <StackPanel DockPanel.Dock="Right"
+                  Orientation="Horizontal"
+                  VerticalAlignment="Center"
+                  Spacing="12"
+                  Margin="0,0,15,0">
+        <TextBlock Text="{Binding OperatorText}"
+                   Foreground="LightGray"
+                   VerticalAlignment="Center"/>
+
+        <TextBlock Text="{Binding ConnectionStatusText}"
+                   Foreground="{Binding ConnectionStatusBrush}"
+                   VerticalAlignment="Center"/>
+      </StackPanel>
+
+      <!-- Center buttons -->
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Center"
+                  Spacing="24">
+        <Button Classes="headerIcon"
+                Command="{Binding OpenConfigCommand}">
+          <StackPanel Margin="0,8,0,0" HorizontalAlignment="Center">
+            <Image Source="avares://Zenitel Connect Pro Operator/Assets/settings.png"
+                   Height="30"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"/>
+            <TextBlock Text="Settings"
+                       FontSize="10"
+                       Foreground="White"
+                       HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+
+        <Button Classes="headerIcon"
+                Command="{Binding OpenToneTestCommand}">
+          <StackPanel Margin="0,8,0,0" HorizontalAlignment="Center">
+            <Image Source="avares://Zenitel Connect Pro Operator/Assets/volume-low-solid.png"
+                   Height="30"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"/>
+            <TextBlock Text="Tone Test"
+                       FontSize="10"
+                       Foreground="White"
+                       HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+
+        <Button Classes="headerIcon"
+                Command="{Binding RefreshCommand}">
+          <StackPanel Margin="0,8,0,0" HorizontalAlignment="Center">
+            <Image Source="avares://Zenitel Connect Pro Operator/Assets/refresh.png"
+                   Height="30"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"/>
+            <TextBlock Text="Refresh"
+                       FontSize="10"
+                       Foreground="White"
+                       HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </DockPanel>
+
+    <!-- Tabs -->
+    <TabControl Grid.Row="1"
+                SelectedIndex="{Binding SelectedTabIndex}">
+      <TabItem Header="Broadcast">
+        <views:GroupsView/>
+      </TabItem>
+      <TabItem Header="Device List">
+        <views:DeviceListView/>
+      </TabItem>
+      <TabItem Header="Call Log">
+        <views:CallLogListView/>
+      </TabItem>
+      <TabItem Header="System Log">
+        <views:LogViewerView/>
+      </TabItem>
+    </TabControl>
+
+  </Grid>
+</UserControl>

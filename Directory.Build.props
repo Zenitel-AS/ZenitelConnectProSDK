@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Disable nullable globally to avoid legacy project compilers that do not support the setting -->
+    <Nullable>disable</Nullable>
+    <!-- Ensure language version is at least 10.0 so file-scoped namespaces are supported -->
+    <LangVersion>10.0</LangVersion>
+    <AvaloniaVersion>11.1.0</AvaloniaVersion>
+  </PropertyGroup>
+</Project>

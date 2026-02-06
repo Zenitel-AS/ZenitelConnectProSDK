@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 using Wamp.Client;
+using Zenitel.IntegrationModule.REST;
 using Timer = System.Timers.Timer;
 
 namespace ConnectPro
@@ -17,6 +20,7 @@ namespace ConnectPro
 
         private Events _events;
         private WampClient _wamp;
+        private RestClient _rest; // Field for managing REST authentication
 
         /// <summary>
         /// Maximum number of reconnection attempts.
@@ -81,6 +85,52 @@ namespace ConnectPro
             _events.OnConfigurationChanged += HandleConfigurationChangeEvent;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConnectionHandler"/> class with REST client support.
+        /// </summary>
+        /// <param name="events">Reference to the events object handling connection-related events.</param>
+        /// <param name="wamp">Reference to the WAMP client for server communication.</param>
+        /// <param name="rest">Reference to the REST client for REST API communication.</param>
+        /// <param name="configuration">Reference to the configuration settings.</param>
+        /// <param name="parentIpAddress">The IP address of the parent device.</param>
+        
+        public ConnectionHandler(ref Events events, ref WampClient wamp, ref RestClient rest, ref Configuration configuration, string parentIpAddress)
+        {
+            _events = events;
+            _wamp = wamp;
+            _rest = rest ?? throw new ArgumentNullException(nameof(rest));
+
+            // Apply configuration settings to the WAMP client.
+            _wamp.WampServerAddr = configuration.ServerAddr;
+            _wamp.WampPort = configuration.Port;
+            _wamp.UserName = configuration.UserName;
+            _wamp.Password = configuration.Password;
+
+            // Apply configuration settings to the REST client.
+            ConfigureRestClient(configuration);
+
+            ParentIpAddress = parentIpAddress;
+
+            // Register event handlers.
+            _wamp.OnConnectChanged += HandleConnectionChangeEvent_Internal;
+            _events.OnConfigurationChanged += HandleConfigurationChangeEvent;
+        }
+        
+        /// <summary>
+        /// Configures the REST client with credentials and server settings from the configuration.
+        /// </summary>
+        /// <param name="configuration">The configuration settings containing server address and credentials.</param>
+        
+        private void ConfigureRestClient(Configuration configuration)
+        {
+            if (_rest == null || configuration == null)
+                return;
+
+            _rest.ServerAddress = configuration.ServerAddr;
+            _rest.UserName = configuration.UserName;
+            _rest.Password = configuration.Password;
+        }
+
         #endregion
 
         #region Event Handlers
@@ -126,7 +176,7 @@ namespace ConnectPro
         }
         
         /// <summary>
-        /// Handles configuration changes by updating the WAMP client settings.
+        /// Handles configuration changes by updating the WAMP and REST client settings.
         /// </summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="config">The updated configuration settings.</param>
@@ -137,6 +187,12 @@ namespace ConnectPro
             this._wamp.WampPort = config.Port;
             this._wamp.UserName = config.UserName;
             this._wamp.Password = config.Password;
+
+            // Update REST client configuration if available
+            if (_rest != null)
+            {
+                ConfigureRestClient(config);
+            }
         }
 
         #endregion
@@ -144,15 +200,46 @@ namespace ConnectPro
         #region Connection Management
 
         /// <summary>
-        /// Opens a new connection to the WAMP server.
+        /// Opens a new connection to both WAMP and REST clients.
         /// </summary>
-       
         public void OpenConnection()
         {
             lock (_lockObject)
             {
                 _wamp.Start();
                 IsReconnecting = true;
+
+                // Authenticate REST client asynchronously if available
+                if (_rest != null)
+                {
+                    _ = AuthenticateRestAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Authenticates the REST client asynchronously.
+        /// </summary>
+        private async Task AuthenticateRestAsync()
+        {
+            try
+            {
+                if (_rest != null)
+                {
+                    bool authSuccess = await _rest.AuthenticateAsync(CancellationToken.None);
+                    if (authSuccess)
+                    {
+                        System.Diagnostics.Debug.WriteLine("REST client authenticated successfully");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("REST client authentication failed");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error authenticating REST client: {ex.Message}");
             }
         }
         
@@ -171,6 +258,12 @@ namespace ConnectPro
                     _maxReconnect--;
                 }
             }
+        }
+
+        public async Task RecoonectAsync()
+        {
+            Recconect();
+            await Task.CompletedTask;
         }
         
         /// <summary>

@@ -23,13 +23,16 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageId>Zenitel.ConnectPro.SDK</PackageId>
-		<Version>1.1.0</Version>
+		<Version>1.1.1</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
 
+	<PropertyGroup>
+		<Nullable>disable</Nullable>
+	</PropertyGroup>
 
 	<PropertyGroup>
   		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
@@ -38,13 +41,13 @@
 
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
 		<DebugType>full</DebugType>
-		<Optimize>false</Optimize>
+		<Optimize>False</Optimize>
 		<DefineConstants>DEBUG;TRACE</DefineConstants>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
 		<DebugType>portable</DebugType>
-		<Optimize>true</Optimize>
+		<Optimize>False</Optimize>
 		<DefineConstants>TRACE</DefineConstants>
 	</PropertyGroup>
 
@@ -54,6 +57,10 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<!-- Generates .snupkg -->
 		<Deterministic>true</Deterministic>
+		<FileVersion>1.1.1.0</FileVersion>
+		<AssemblyVersion>1.1.1.0</AssemblyVersion>
+		<Title>Zenitel Connect Pro SDK</Title>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<!-- Ensures builds are reproducible -->
 	</PropertyGroup>
 
@@ -93,6 +100,21 @@
 
 	<ItemGroup>
 		<None Include="README.md" Pack="true" PackagePath="" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="Properties\Resources.Designer.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>Resources.resx</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Update="Properties\Resources.resx">
+	    <Generator>ResXFileCodeGenerator</Generator>
+	    <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+	  </EmbeddedResource>
 	</ItemGroup>
 
 

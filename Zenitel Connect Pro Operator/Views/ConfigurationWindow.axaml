@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+        mc:Ignorable="d"
+        x:Class="ZenitelConnectProOperator.Views.ConfigurationWindow"
+        x:DataType="vm:ConfigurationViewModel"
+        Width="560"
+        MinWidth="520"
+        Height="520"
+        MinHeight="480"
+        Title="Configuration">
+
+  <Design.DataContext>
+    <vm:ConfigurationViewModel />
+  </Design.DataContext>
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16" >
+    <!-- Header -->
+    <StackPanel>
+      <TextBlock Text="Zenitel Connect Pro" FontSize="18" FontWeight="SemiBold"/>
+      <TextBlock Text="Connection settings" Opacity="0.75"/>
+    </StackPanel>
+
+    <!-- Form -->
+    <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+            ColumnDefinitions="160,*">
+
+        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Server address"/>
+        <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddr}" Watermark="e.g. 10.8.33.5"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Port"/>
+        <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding Port}" Watermark="e.g. 8086"/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Realm"/>
+        <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding Realm}" Watermark="e.g. zenitel"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Username"/>
+        <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding UserName}"/>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Password"/>
+        <TextBox   Grid.Row="4" Grid.Column="1"
+                   Text="{Binding Password}"
+                   PasswordChar="●"/>
+
+        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Operator DIRNO"/>
+        <ComboBox  Grid.Row="5" Grid.Column="1"
+                   ItemsSource="{Binding OperatorOptions}"
+                   SelectedItem="{Binding SelectedOperator}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Display}"/>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Connection"/>
+        <TextBlock Grid.Row="6" Grid.Column="1"
+                   Text="{Binding ConnectionStatusText}"
+                   FontWeight="SemiBold"/>
+
+        <ProgressBar Grid.Row="7" Grid.ColumnSpan="2"
+                     IsIndeterminate="{Binding IsBusy}"
+                     Height="6"/>
+      </Grid>
+    </Border>
+
+    <!-- Buttons -->
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Close" Command="{Binding CloseCommand}"/>
+      <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"/>
+    </StackPanel>
+  </Grid>
+</Window>

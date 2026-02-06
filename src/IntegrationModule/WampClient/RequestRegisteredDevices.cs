@@ -1,9 +1,10 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
-using WampSharp.V2.PubSub;
 using WampSharp.V2.Core.Contracts;
+using WampSharp.V2.PubSub;
 
 namespace Wamp.Client
 {
@@ -75,16 +76,23 @@ namespace Wamp.Client
         /// <param name="queueDirNo">Only return call queue with this directory number.</param>
         /// <returns>The method returns a list of call queues according to the filtering specified via the parameters.</returns>
         /***********************************************************************************************************************/
-        public List<wamp_call_leg_element> requestQueuedCalls(string queueDirNo)
-        /***********************************************************************************************************************/
+        public List<wamp_call_queue_element> requestQueuedCalls(string queueDirNo)
         {
             object res = GET_calls_queued(queueDirNo);
+
+            if (res == null)
+            {
+                OnChildLogString?.Invoke(this, "requestQueuedCalls: no result (not connected or server returned null).");
+                return new List<wamp_call_queue_element>();
+            }
+
             string json_str = res.ToString();
             OnChildLogString?.Invoke(this, json_str);
 
-            List<wamp_call_leg_element> callQueuedList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_call_leg_element>>(json_str);
-            return callQueuedList;
+            var list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_call_queue_element>>(json_str);
+            return list ?? new List<wamp_call_queue_element>();
         }
+
 
         /// <summary>
         /// This methods requests the Call Legs from the Zenitel Connect Platform. The returned list may be filtered by adding the following
@@ -121,49 +129,44 @@ namespace Wamp.Client
         /// <returns>The method returns a list of GPO elements according to the filtering specified via the parameters.</returns>
         /***********************************************************************************************************************/
         public List<wamp_device_gpio_element> requestDevicesGPOs(string dirNo, string Id)
-        /***********************************************************************************************************************/
         {
             object res = GET_devices_gpos(dirNo, Id);
 
-            if (res != null)
-            {
-                string json_str = res.ToString();
-                OnChildLogString?.Invoke(this, json_str);
-                List<wamp_device_gpio_element> gpoElementList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_device_gpio_element>>(json_str);
-                return gpoElementList;
-            }
-            else
-            {
-                List<wamp_device_gpio_element> gpoElementList = new List<wamp_device_gpio_element>();
-                return gpoElementList;
-            }
+            if (res == null) return new List<wamp_device_gpio_element>();
+
+            string json_str = res.ToString();
+            OnChildLogString?.Invoke(this, json_str);
+
+            return JsonConvert.DeserializeObject<List<wamp_device_gpio_element>>(json_str)
+                   ?? new List<wamp_device_gpio_element>();
         }
+
 
         /// <summary>
-        /// This method requests a status list of General Purpose Inputs Ports.
+        /// Requests a status list of General Purpose Input (GPI) ports.
         /// </summary>
-        /// <param name="device_id">This is the ID of the device having the General Inport Port</param>
-        /// <param name="id">This is the name of the General Purpose Inport Port</param>
-        /// <returns>The method returns a list of GPI elements according to the filtering specified via the parameters.</returns>
-        /***********************************************************************************************************************/
+        /// <param name="device_id">ID (dirno or mac) of the device</param>
+        /// <param name="id">
+        /// Name of the GPI port.
+        /// Pass empty string to retrieve ALL GPIs.
+        /// </param>
         public List<wamp_device_gpio_element> requestDevicesGPIs(string device_id, string id)
-        /***********************************************************************************************************************/
         {
-            object res = GET_devices_gpis(device_id, id);
+            object res;
 
-            if (res != null)
-            {
-                string json_str = res.ToString();
-                OnChildLogString?.Invoke(this, json_str);
-                List<wamp_device_gpio_element> gpoElementList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_device_gpio_element>>(json_str);
-                return gpoElementList;
-            }
-            else
-            {
-                List<wamp_device_gpio_element> gpoElementList = new List<wamp_device_gpio_element>();
-                return gpoElementList;
-            }
+            res = GET_devices_gpis(device_id, id);
+
+            if (res == null)
+                return new List<wamp_device_gpio_element>();
+
+            var json = res.ToString();
+            OnChildLogString?.Invoke(this, json);
+
+            return Newtonsoft.Json.JsonConvert
+                .DeserializeObject<List<wamp_device_gpio_element>>(json)
+                ?? new List<wamp_device_gpio_element>();
         }
+
 
         /// <summary>
         /// This method requests the current software version of the Zenitel Connect Pro.
