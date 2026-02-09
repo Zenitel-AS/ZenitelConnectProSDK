@@ -1,5 +1,6 @@
 ﻿using ConnectPro.Models;
 using ConnectPro.Tools;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Wamp.Client;
+using Zenitel.IntegrationModule.REST;
 
 namespace ConnectPro.Handlers
 {
@@ -18,6 +20,7 @@ namespace ConnectPro.Handlers
         private Collections _collections;
         private Events _events;
         private WampClient _wamp;
+        private RestClient _rest;
         private object _lockObj = new object();
         private CancellationTokenSource _playbackCancellationTokenSource;
 
@@ -42,15 +45,18 @@ namespace ConnectPro.Handlers
         /// <param name="collections">Reference to the collections object for managing groups and audio messages.</param>
         /// <param name="events">Reference to the events object for triggering broadcasting-related events.</param>
         /// <param name="wamp">Reference to the WAMP client for communication.</param>
+        /// <param name="rest">Reference to the REST client for fetching group members.</param>
         /// <param name="parentIpAddress">The IP address of the parent device.</param>
         public BroadcastingHandler(ref Collections collections,
                                    ref Events events,
                                    ref WampClient wamp,
+                                   ref RestClient rest,
                                    string parentIpAddress)
         {
             _collections = collections;
             _events = events;
             _wamp = wamp;
+            _rest = rest;
             ParentIpAddress = parentIpAddress;
 
             _events.OnConnectionChanged += HandleConnectionChange;
@@ -82,43 +88,114 @@ namespace ConnectPro.Handlers
 
         /// <summary>
         /// Retrieves groups from the server and updates the groups collection.
+        /// Uses WAMP for the initial group list, then REST to fill in members.
         /// </summary>
         public async Task RetrieveGroups()
         {
-            await Task.Run(() =>
+            lock (_lockObj)
             {
-                lock (_lockObj)
+                if (IsExecutingGroupRetrieval)
+                    return;
+                IsExecutingGroupRetrieval = true;
+            }
+
+            try
+            {
+                if (_wamp.IsConnected)
                 {
-                    try
-                    {
-                        if (!IsExecutingGroupRetrieval)
-                        {
-                            IsExecutingGroupRetrieval = true;
-                            if (_wamp.IsConnected)
-                            {
-                                _collections.Groups = GetGroups().ToList();
-                                _events.OnGroupsListChange?.Invoke(this, new EventArgs());
-                            }
-                            IsExecutingGroupRetrieval = false;
-                        }
-                    }
-                    catch (Exception exe)
-                    {
-                        _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
-                        _events.OnGroupsListChange?.Invoke(this, new EventArgs());
-                        _events.OnExceptionThrown?.Invoke(this, exe);
-                    }
+                    var groups = GetGroups().ToList();
+                    await FillGroupMembersFromRestAsync(groups);
+                    _collections.Groups = groups;
+                    _events.OnGroupsListChange?.Invoke(this, new EventArgs());
                 }
-            });
+            }
+            catch (Exception exe)
+            {
+                _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
+                _events.OnGroupsListChange?.Invoke(this, new EventArgs());
+                _events.OnExceptionThrown?.Invoke(this, exe);
+            }
+            finally
+            {
+                IsExecutingGroupRetrieval = false;
+            }
         }
 
         /// <summary>
-        /// Retrieves groups from the server.
+        /// Retrieves groups from the server via WAMP.
         /// </summary>
         /// <returns>A collection of <see cref="Group"/> objects.</returns>
         public IEnumerable<Group> GetGroups()
         {
             return ObjectConverter.ConvertSdkGroupElementList(_wamp.requestGroups("", true).ToList());
+        }
+
+        /// <summary>
+        /// REST response model matching the /api/groups endpoint JSON shape.
+        /// </summary>
+        private class RestGroupResponse
+        {
+            [JsonProperty("call_timeout")]
+            public int CallTimeout { get; set; }
+
+            [JsonProperty("dirno")]
+            public string Dirno { get; set; }
+
+            [JsonProperty("displayname")]
+            public string DisplayName { get; set; }
+
+            [JsonProperty("members")]
+            public string[] Members { get; set; }
+
+            [JsonProperty("priority")]
+            public int Priority { get; set; }
+        }
+
+        /// <summary>
+        /// Fills in group members using the REST API for groups that have no members after WAMP retrieval.
+        /// </summary>
+        /// <param name="groups">The list of groups to fill members for.</param>
+        private async Task FillGroupMembersFromRestAsync(List<Group> groups)
+        {
+            if (_rest == null || groups == null || groups.Count == 0)
+                return;
+
+            try
+            {
+                string response = await _rest.GetAsync("/api/groups?verbose=true").ConfigureAwait(false);
+                if (string.IsNullOrEmpty(response))
+                    return;
+
+                var restGroups = JsonConvert.DeserializeObject<List<RestGroupResponse>>(response);
+                if (restGroups == null)
+                    return;
+
+                // Build a lookup by dirno for quick matching
+                var memberLookup = new Dictionary<string, string[]>();
+                foreach (var rg in restGroups)
+                {
+                    if (rg.Dirno != null && rg.Members != null && rg.Members.Length > 0)
+                    {
+                        memberLookup[rg.Dirno] = rg.Members;
+                    }
+                }
+
+                // Fill in members for groups that are missing them
+                foreach (var group in groups)
+                {
+                    string[] members;
+                    if ((group.Members == null || group.Members.Length == 0)
+                        && memberLookup.TryGetValue(group.Dirno, out members))
+                    {
+                        group.Members = members;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail - groups will just have no members
+                _events.OnDebugChanged?.Invoke(this, ("REST group members retrieval failed: " + ex.Message, ex));
+            }
         }
 
         /// <summary>

@@ -113,6 +113,9 @@
       <TabItem Header="Device List">
         <views:DeviceListView/>
       </TabItem>
+      <TabItem Header="Call Forwarding">
+        <views:CallForwardingView/>
+      </TabItem>
       <TabItem Header="Call Log">
         <views:CallLogListView/>
       </TabItem>

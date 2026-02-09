@@ -189,6 +189,11 @@ namespace ConnectPro
         /// </summary>
         public EventHandler<bool> OnAudioMessagesChange { get; set; }
 
+        /// <summary>
+        /// Occurs when the call forwarding rules list changes.
+        /// </summary>
+        public EventHandler OnCallForwardingRulesChange { get; set; }
+
         #endregion
     }
 

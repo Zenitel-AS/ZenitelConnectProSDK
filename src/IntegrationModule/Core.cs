@@ -120,6 +120,11 @@ namespace ConnectPro
         public BroadcastingHandler BroadcastingHandler { get; set; }
 
         /// <summary>
+        /// Gets or sets the call forwarding handler for managing call forwarding rules.
+        /// </summary>
+        public CallForwardingHandler CallForwardingHandler { get; set; }
+
+        /// <summary>
         /// Gets or sets the log manager for handling debug logs.
         /// </summary>
         public Debug.Log Log { get; set; }
@@ -208,7 +213,8 @@ namespace ConnectPro
             CallHandler = new CallHandler(ref _collection, ref _events, ref _wamp, ref _configuration, Configuration.ServerAddr);
             ConnectionHandler = new ConnectionHandler(ref _events, ref _wamp, ref _rest, ref _configuration, Configuration.ServerAddr);
             AccessControlHandler = new AccessControlHandler(ref _events, ref _wamp, ref _configuration);
-            BroadcastingHandler = new BroadcastingHandler(ref _collection, ref _events, ref _wamp, Configuration.ServerAddr);
+            BroadcastingHandler = new BroadcastingHandler(ref _collection, ref _events, ref _wamp, ref _rest, Configuration.ServerAddr);
+            CallForwardingHandler = new CallForwardingHandler(ref _collection, ref _events, ref _wamp, ref _rest, Configuration.ServerAddr);
             Log = new Debug.Log(Collection, Events);
 
             _isRuning = true;
@@ -272,6 +278,7 @@ namespace ConnectPro
                 CallHandler?.Dispose();
                 AccessControlHandler?.Dispose();
                 BroadcastingHandler?.Dispose();
+                CallForwardingHandler?.Dispose();
                 Log?.Dispose();
                 ConnectionHandler?.Dispose();
 
@@ -282,6 +289,7 @@ namespace ConnectPro
                 CallHandler = null;
                 AccessControlHandler = null;
                 BroadcastingHandler = null;
+                CallForwardingHandler = null;
                 Log = null;
                 ConnectionHandler = null;
                 _wamp = null;

@@ -8,47 +8,107 @@
              xmlns:views="clr-namespace:ZenitelConnectProOperator.Views"
              mc:Ignorable="d">
 
+  <UserControl.Styles>
+    <Style Selector="Border.groupRow">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Padding" Value="12,8"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Margin" Value="0,2"/>
+    </Style>
+    <Style Selector="Border.groupRow:pointerover">
+      <Setter Property="Background" Value="#1A000000"/>
+    </Style>
+  </UserControl.Styles>
+
   <Design.DataContext>
     <vm:GroupsViewModel />
   </Design.DataContext>
 
   <Border Padding="12" CornerRadius="8" BorderThickness="1">
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
 
       <TextBlock Text="Groups" FontSize="16" FontWeight="SemiBold"/>
 
-      <DataGrid Grid.Row="1"
-                ItemsSource="{Binding Groups}"
-                AutoGenerateColumns="False"
-                IsReadOnly="True"
-                GridLinesVisibility="All">
+      <!-- Column headers -->
+      <Border Grid.Row="1"
+              Padding="12,6"
+              CornerRadius="4"
+              Background="Transparent"
+              Margin="0,4,0,4">
+        <Grid ColumnDefinitions="100,*,100,180,200">
+          <TextBlock Grid.Column="0" Text="DIRNO" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+          <TextBlock Grid.Column="1" Text="Name" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+          <TextBlock Grid.Column="2" Text="Members" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+          <TextBlock Grid.Column="3" Text="Message" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+          <TextBlock Grid.Column="4" Text="Actions" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+        </Grid>
+      </Border>
 
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="DIRNO" Binding="{Binding DirNo}" Width="120"/>
-          <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="*"/>
-          <DataGridTextColumn Header="Message" Binding="{Binding BroadcastedMessageName}" Width="220"/>
+      <!-- Group list -->
+      <ScrollViewer Grid.Row="2">
+        <ItemsControl ItemsSource="{Binding Groups}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="2"/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
 
-          <DataGridTemplateColumn Header="Actions" Width="240">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Call"
-                        Command="{Binding InitiateGroupCallCommand, RelativeSource={RelativeSource AncestorType=views:GroupsView}}"
-                        CommandParameter="{Binding}"
-                        IsEnabled="{Binding CanInitiateCall}"/>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:GroupRowViewModel">
+              <Border Classes="groupRow">
+                <StackPanel Spacing="0">
+                  <!-- Main row -->
+                  <Grid ColumnDefinitions="100,*,100,180,200">
+                    <TextBlock Grid.Column="0" Text="{Binding DirNo}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    <Button Grid.Column="2" Content="{Binding MemberCountText}" 
+                            Background="Transparent" Padding="4,2" FontSize="12"
+                            Command="{Binding ToggleMembersExpandedCommand}"
+                            HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="3" Text="{Binding BroadcastedMessageName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Opacity="0.9"/>
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Button Content="Call"
+                              Command="{Binding InitiateGroupCallCommand, RelativeSource={RelativeSource AncestorType=views:GroupsView}}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanInitiateCall}"/>
+                      <Button Content="Messages"
+                              Command="{Binding OpenMessagesCommand, RelativeSource={RelativeSource AncestorType=views:GroupsView}}"
+                              CommandParameter="{Binding}"/>
+                    </StackPanel>
+                  </Grid>
 
-                <Button Content="Messages"
-                        Command="{Binding OpenMessagesCommand, RelativeSource={RelativeSource AncestorType=views:GroupsView}}"
-                        CommandParameter="{Binding}"/>
+                  <!-- Expandable members panel -->
+                  <Border Padding="16,8,16,8" Margin="0,6,0,0" CornerRadius="4"
+                          Background="#0A000000"
+                          IsVisible="{Binding IsMembersExpanded}">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="Group Members" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                      <ItemsControl ItemsSource="{Binding MemberItems}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:MemberDisplayItem">
+                            <Border Padding="8,4" Margin="2" CornerRadius="4" BorderThickness="1" BorderBrush="#30000000">
+                              <TextBlock Text="{Binding DisplayText}" FontSize="12"/>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="No members" FontSize="12" Opacity="0.5"
+                                 IsVisible="{Binding !MemberCount}"/>
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
 
-        </DataGrid.Columns>
-      </DataGrid>
-
-      <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Spacing="8">
+      <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" Spacing="8">
         <Button Content="M (press)" Command="{Binding MPressCommand}"/>
         <Button Content="M (release)" Command="{Binding MReleaseCommand}"/>
         <Button Content="Refresh" Command="{Binding RefreshCommand}" HorizontalAlignment="Right"/>

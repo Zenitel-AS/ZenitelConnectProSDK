@@ -18,6 +18,7 @@ namespace ConnectPro
         private List<Group> _groups;
         private List<AudioMessage> _audioMessages;
         private List<DirectoryNumber> _directoryNumbers;
+        private List<CallForwardingRule> _callForwardingRules;
 
         #endregion
 
@@ -153,6 +154,25 @@ namespace ConnectPro
                 return _directoryNumbers;
             }
             set { _directoryNumbers = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the collection of all call forwarding rules.
+        /// </summary>
+        /// <remarks>
+        /// Call forwarding rules define how calls to a directory number are redirected.
+        /// </remarks>
+        public List<CallForwardingRule> CallForwardingRules
+        {
+            get
+            {
+                if (_callForwardingRules == null)
+                {
+                    _callForwardingRules = new List<CallForwardingRule>();
+                }
+                return _callForwardingRules;
+            }
+            set { _callForwardingRules = value; }
         }
 
         #endregion

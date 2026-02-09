@@ -655,5 +655,63 @@ namespace Wamp.Client
             public List<wamp_operator_element> operators { get; set; }
         }
 
+        /// <summary>
+        /// This class encapsulates a call forwarding rule element as returned by the API.
+        /// </summary>
+        public class wamp_call_forwarding_element
+        {
+            /// <summary>
+            /// The directory number that owns this forwarding rule.
+            /// </summary>
+            public string dirno { get; set; }
+
+            /// <summary>
+            /// The type of forwarding: "unconditional", "on_busy", or "on_timeout".
+            /// </summary>
+            public string fwd_type { get; set; }
+
+            /// <summary>
+            /// The directory number to forward calls to.
+            /// </summary>
+            public string fwd_to { get; set; }
+
+            /// <summary>
+            /// Indicates whether the forwarding rule is enabled.
+            /// </summary>
+            public bool enabled { get; set; }
+        }
+
+        /// <summary>
+        /// This class defines the response from a POST to the call forwarding API.
+        /// </summary>
+        public class wamp_call_forwarding_post_response
+        {
+            /// <summary>
+            /// The number of input entries that failed validation.
+            /// </summary>
+            public int error_cnt { get; set; }
+
+            /// <summary>
+            /// The number of entries that were successfully updated or added.
+            /// </summary>
+            public int update_cnt { get; set; }
+
+            /// <summary>
+            /// List of error descriptions, if any.
+            /// </summary>
+            public List<string> errors { get; set; }
+        }
+
+        /// <summary>
+        /// This class defines the response from a DELETE to the call forwarding API.
+        /// </summary>
+        public class wamp_call_forwarding_delete_response
+        {
+            /// <summary>
+            /// The number of entries that were deleted.
+            /// </summary>
+            public int delete_cnt { get; set; }
+        }
+
     }
 }

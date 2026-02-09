@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -30,17 +31,16 @@ public partial class GroupsViewModel : ObservableObject, IDisposable
         _connectPro = connectPro;
 
         _connectPro.Core.Events.OnConnectionChanged += OnConnectionChanged;
-        _connectPro.Core.Events.OnGroupsListChange += (s, e) =>
-        {
-            // The intent is to trigger RefreshGroups safely on the UI thread;
-            // Avalonia is merely the dispatch mechanism, not the focus or dependency here.
-            Avalonia.Threading.Dispatcher.UIThread.Post(RefreshGroups);
-        };
+        _connectPro.Core.Events.OnGroupsListChange += OnGroupsListChanged;
 
         RefreshGroups();
     }
 
-    private void OnConnectionChanged(object? sender, bool e) => RefreshGroups();
+    private void OnConnectionChanged(object? sender, bool e) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(RefreshGroups);
+
+    private void OnGroupsListChanged(object? sender, EventArgs e) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(RefreshGroups);
 
     [RelayCommand]
     private void Refresh() => RefreshGroups();
@@ -60,9 +60,11 @@ public partial class GroupsViewModel : ObservableObject, IDisposable
             .OrderBy(g => g.Dirno)
             .ToList() ?? new();
 
+        var devices = _connectPro.Core.Collection.RegisteredDevices ?? new List<Device>();
+
         Groups.Clear();
         foreach (var g in groups)
-            Groups.Add(new GroupRowViewModel(g));
+            Groups.Add(new GroupRowViewModel(g, devices));
     }
 
     [RelayCommand]
@@ -130,13 +132,18 @@ public partial class GroupsViewModel : ObservableObject, IDisposable
         if (_connectPro is not null)
         {
             _connectPro.Core.Events.OnConnectionChanged -= OnConnectionChanged;
+            _connectPro.Core.Events.OnGroupsListChange -= OnGroupsListChanged;
         }
     }
 }
 
 public partial class GroupRowViewModel : ObservableObject
 {
-    public GroupRowViewModel(Group group) => Group = group;
+    public GroupRowViewModel(Group group, IList<Device>? devices = null)
+    {
+        Group = group;
+        ResolveMembers(devices);
+    }
 
     public Group Group { get; }
 
@@ -158,8 +165,49 @@ public partial class GroupRowViewModel : ObservableObject
 
     public bool CanInitiateCall => !Group.IsBusy;
 
+    public int MemberCount => Group.Members?.Length ?? 0;
+    public string MemberCountText => $"{MemberCount} member{(MemberCount == 1 ? "" : "s")}";
+
+    public ObservableCollection<MemberDisplayItem> MemberItems { get; } = new();
+
+    [ObservableProperty]
+    private bool _isMembersExpanded;
+
+    [RelayCommand]
+    private void ToggleMembersExpanded() => IsMembersExpanded = !IsMembersExpanded;
+
+    private void ResolveMembers(IList<Device>? devices)
+    {
+        MemberItems.Clear();
+
+        if (Group.Members is null || Group.Members.Length == 0)
+            return;
+
+        foreach (var dirno in Group.Members)
+        {
+            var device = devices?.FirstOrDefault(d => d.dirno == dirno);
+            var name = device?.name;
+            MemberItems.Add(new MemberDisplayItem(dirno, name));
+        }
+    }
+
     public void NotifyBusyChanged()
     {
         OnPropertyChanged(nameof(CanInitiateCall));
     }
+}
+
+public class MemberDisplayItem
+{
+    public MemberDisplayItem(string dirNo, string? deviceName)
+    {
+        DirNo = dirNo;
+        DeviceName = deviceName;
+    }
+
+    public string DirNo { get; }
+    public string? DeviceName { get; }
+    public string DisplayText => string.IsNullOrWhiteSpace(DeviceName)
+        ? DirNo
+        : $"{DirNo} – {DeviceName}";
 }

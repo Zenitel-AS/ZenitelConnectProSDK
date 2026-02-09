@@ -156,6 +156,20 @@ namespace Wamp.Client
         /// <summary>Send open door request from station.</summary>
         public const string PostWampOpenDoor = "com.zenitel.calls.call.open_door.post";
 
+        //CALL FORWARDING:
+
+        /// <summary>Zenitel Link Path for retrieving call forwarding rules.</summary>
+        //GET api/call_forwarding
+        public const string GetCallForwarding = "com.zenitel.call_forwarding";
+
+        /// <summary>Zenitel Link Path for adding or updating call forwarding rules.</summary>
+        //POST api/call_forwarding
+        public const string PostCallForwarding = "com.zenitel.call_forwarding.post";
+
+        /// <summary>Zenitel Link Path for deleting call forwarding rules.</summary>
+        //DELETE api/call_forwarding
+        public const string DeleteCallForwarding = "com.zenitel.call_forwarding.delete";
+
         /// <summary>Send request Zenitel Connect Software Version </summary>
         public const string GetPlatformVersion = "com.zenitel.system.platform.version";
 

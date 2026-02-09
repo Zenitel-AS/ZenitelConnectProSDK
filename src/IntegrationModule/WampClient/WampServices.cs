@@ -43,6 +43,9 @@ namespace Wamp.Client
 
         [WampProcedure(WampClient.GetDirectoriesList)]
         object GET_directories(string dirno);
+
+        [WampProcedure(WampClient.GetCallForwarding)]
+        object GET_call_forwarding(string dirno, string fwd_type);
     }
 
 
