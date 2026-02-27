@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using static Wamp.Client.WampClient;
 
@@ -66,18 +67,38 @@ namespace ConnectPro.Debug
 
         /// <summary>
         /// Retrieves a device from the lookup dictionary based on the directory number.
+        /// Falls back to audio messages, groups, and queued calls if no registered device matches.
         /// </summary>
         /// <param name="dirno">Directory number of the device.</param>
-        /// <returns>The matching <see cref="Device"/> object.</returns>
-        /// <exception cref="InvalidOperationException">Thrown if the device is not found.</exception>
-        
-        private Device GetDeviceByDirno(string dirno)
+        /// <returns>The matching <see cref="Device"/> object, or a placeholder device for non-device directory numbers.</returns>
+        /// <exception cref="InvalidOperationException">Thrown if the directory number is not found in any collection.</exception>
+
+        private object GetObjectByDirno(string dirno)
         {
             if (_deviceLookup.TryGetValue(dirno, out var device))
             {
                 return device;
             }
-            throw new InvalidOperationException($"Device with dirno {dirno} not found.");
+
+            var audioMessage = _collections.AudioMessages?.FirstOrDefault(a => a.Dirno == dirno);
+            if (audioMessage != null)
+            {
+                return audioMessage;
+            }
+
+            var group = _collections.Groups?.FirstOrDefault(g => g.Dirno == dirno);
+            if (group != null)
+            {
+                return group;
+            }
+
+            var queueEntry = _collections.CallQueue?.FirstOrDefault(q => q.dirno == dirno);
+            if (queueEntry != null)
+            {
+                return queueEntry;
+            }
+
+            throw new InvalidOperationException($"Object with dirno {dirno} not found.");
         }
 
         #endregion
@@ -119,20 +140,20 @@ namespace ConnectPro.Debug
         {
             if (call_info is wamp_call_element wampCallElement)
             {
-                var senderDevice = GetDeviceByDirno(wampCallElement.from_dirno);
-                return PopulateLogEntry(senderDevice, wampCallElement.from_dirno, wampCallElement.to_dirno,
+                var senderObject = GetObjectByDirno(wampCallElement.from_dirno);
+                return PopulateLogEntry(senderObject, wampCallElement.from_dirno, wampCallElement.to_dirno,
                                         wampCallElement.to_dirno_current, "Call", wampCallElement.state, wampCallElement.reason);
             }
             else if (call_info is wamp_call_leg_element callLegElement)
             {
-                var senderDevice = GetDeviceByDirno(callLegElement.from_dirno);
-                return PopulateLogEntry(senderDevice, callLegElement.from_dirno, callLegElement.to_dirno,
+                var senderObject = GetObjectByDirno(callLegElement.from_dirno);
+                return PopulateLogEntry(senderObject, callLegElement.from_dirno, callLegElement.to_dirno,
                                         "", "Queue", callLegElement.state, callLegElement.reason);
             }
             else if (call_info is CallElement callElement)
             {
-                var senderDevice = GetDeviceByDirno(callElement.FromDirno);
-                return PopulateLogEntry(senderDevice, callElement.FromDirno, callElement.ToDirno,
+                var senderObject = GetObjectByDirno(callElement.FromDirno);
+                return PopulateLogEntry(senderObject, callElement.FromDirno, callElement.ToDirno,
                                         callElement.ToDirnoCurrent, "Call", callElement.CallState.ToString(), callElement?.Reason.ToString());
             }
             else
@@ -144,7 +165,7 @@ namespace ConnectPro.Debug
         /// <summary>
         /// Populates a <see cref="CallLog"/> entry with relevant details.
         /// </summary>
-        /// <param name="senderDevice">The originating device.</param>
+        /// <param name="senderObject">The originating object (Device, AudioMessage, Group, or CallLegElement).</param>
         /// <param name="fromDirno">The directory number of the sender.</param>
         /// <param name="toDirno">The directory number of the receiver.</param>
         /// <param name="answeredByDirno">The directory number of the device that answered the call.</param>
@@ -152,22 +173,58 @@ namespace ConnectPro.Debug
         /// <param name="state">The state of the call.</param>
         /// <param name="reason">The reason for the call event.</param>
         /// <returns>A populated <see cref="CallLog"/> entry.</returns>
-        
-        private CallLog PopulateLogEntry(Device senderDevice, string fromDirno, string toDirno, string answeredByDirno, string callType, string state, string reason)
+
+        private CallLog PopulateLogEntry(object senderObject, string fromDirno, string toDirno, string answeredByDirno, string callType, string state, string reason)
         {
+            ResolveNameAndLocation(senderObject, out string deviceName, out string location);
+
             return new CallLog
             {
                 Time = DateTime.UtcNow,
-                DeviceName = senderDevice?.name ?? "Unknown Device",
+                DeviceName = deviceName,
                 FromDirno = fromDirno,
                 ToDirno = toDirno,
                 AnsweredByDirno = answeredByDirno,
                 CallType = callType,
                 State = GetDescriptiveState(state),
                 Reason = reason,
-                sender = senderDevice,
-                Location = senderDevice?.location ?? "Unknown Location"
+                sender = senderObject,
+                Location = location
             };
+        }
+
+        /// <summary>
+        /// Resolves the display name and location from the sender object based on its type.
+        /// </summary>
+        /// <param name="senderObject">The sender object.</param>
+        /// <param name="name">The resolved display name.</param>
+        /// <param name="location">The resolved location.</param>
+
+        private void ResolveNameAndLocation(object senderObject, out string name, out string location)
+        {
+            switch (senderObject)
+            {
+                case Device device:
+                    name = device.name ?? "Unknown Device";
+                    location = device.location ?? "Unknown Location";
+                    break;
+                case AudioMessage audioMessage:
+                    name = audioMessage.DisplayName ?? audioMessage.Description ?? "Audio Message";
+                    location = "Audio Message";
+                    break;
+                case Group group:
+                    name = group.DisplayName ?? "Group";
+                    location = "Group";
+                    break;
+                case CallLegElement queueEntry:
+                    name = queueEntry.name ?? "Queue";
+                    location = "Queue";
+                    break;
+                default:
+                    name = "Unknown Device";
+                    location = "Unknown Location";
+                    break;
+            }
         }
 
         /// <summary>

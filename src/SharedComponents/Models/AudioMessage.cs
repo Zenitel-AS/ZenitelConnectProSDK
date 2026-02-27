@@ -59,10 +59,40 @@ namespace ConnectPro.Models
         public int Id { get; set; }
 
         /// <summary>
+        /// Gets or sets the description of the audio message.
+        /// </summary>
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        /// <summary>
         /// Gets or sets the directory number associated with the audio message.
         /// </summary>
         [JsonProperty("dirno")]
         public string Dirno { get; set; }
+
+        /// <summary>
+        /// Gets or sets the directory number identifier.
+        /// </summary>
+        [JsonProperty("dirno_id")]
+        public int DirnoId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the display name of the audio message.
+        /// </summary>
+        [JsonProperty("displayname")]
+        public string DisplayName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the duration of the audio message in seconds.
+        /// </summary>
+        [JsonProperty("duration")]
+        public int? Duration { get; set; }
+
+        /// <summary>
+        /// Gets or sets the feature type of the audio message.
+        /// </summary>
+        [JsonProperty("feature_type")]
+        public string FeatureType { get; set; }
 
         /// <summary>
         /// Gets or sets the filename of the audio message.
@@ -83,10 +113,16 @@ namespace ConnectPro.Models
         public int FileSize { get; set; }
 
         /// <summary>
-        /// Gets or sets the duration of the audio message in seconds.
+        /// Gets or sets the unique message identifier.
         /// </summary>
-        [JsonProperty("duration")]
-        public int? Duration { get; set; }
+        [JsonProperty("message_id")]
+        public int MessageId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of repetitions for the audio message.
+        /// </summary>
+        [JsonProperty("repetitions")]
+        public int Repetitions { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the audio message is currently playing.
@@ -138,11 +174,17 @@ namespace ConnectPro.Models
         /// <param name="sdkAudioMessageElement">The SDK audio message element to initialize the object from.</param>
         public AudioMessage(WampClient.wamp_audio_messages_element sdkAudioMessageElement)
         {
+            Description = sdkAudioMessageElement.description;
             Dirno = sdkAudioMessageElement.dirno;
+            DirnoId = sdkAudioMessageElement.dirno_id;
+            DisplayName = sdkAudioMessageElement.displayname;
+            Duration = sdkAudioMessageElement.duration;
+            FeatureType = sdkAudioMessageElement.feature_type;
             FileName = sdkAudioMessageElement.filename;
             FilePath = sdkAudioMessageElement.filepath;
             FileSize = sdkAudioMessageElement.filesize;
-            Duration = sdkAudioMessageElement.duration;
+            MessageId = sdkAudioMessageElement.message_id;
+            Repetitions = sdkAudioMessageElement.repetitions;
         }
 
         #endregion
@@ -155,11 +197,17 @@ namespace ConnectPro.Models
         /// <param name="sdkAudioMessageElement">The SDK audio message element containing new values.</param>
         public void SetValuesFromSDK(WampClient.wamp_audio_messages_element sdkAudioMessageElement)
         {
+            Description = sdkAudioMessageElement.description;
             Dirno = sdkAudioMessageElement.dirno;
+            DirnoId = sdkAudioMessageElement.dirno_id;
+            DisplayName = sdkAudioMessageElement.displayname;
+            Duration = sdkAudioMessageElement.duration;
+            FeatureType = sdkAudioMessageElement.feature_type;
             FileName = sdkAudioMessageElement.filename;
             FilePath = sdkAudioMessageElement.filepath;
             FileSize = sdkAudioMessageElement.filesize;
-            Duration = sdkAudioMessageElement.duration;
+            MessageId = sdkAudioMessageElement.message_id;
+            Repetitions = sdkAudioMessageElement.repetitions;
         }
 
         /// <summary>
@@ -171,11 +219,17 @@ namespace ConnectPro.Models
         {
             return new AudioMessage()
             {
+                Description = sdkAudioMessageElement.description,
                 Dirno = sdkAudioMessageElement.dirno,
+                DirnoId = sdkAudioMessageElement.dirno_id,
+                DisplayName = sdkAudioMessageElement.displayname,
+                Duration = sdkAudioMessageElement.duration,
+                FeatureType = sdkAudioMessageElement.feature_type,
                 FileName = sdkAudioMessageElement.filename,
                 FilePath = sdkAudioMessageElement.filepath,
                 FileSize = sdkAudioMessageElement.filesize,
-                Duration = sdkAudioMessageElement.duration
+                MessageId = sdkAudioMessageElement.message_id,
+                Repetitions = sdkAudioMessageElement.repetitions
             };
         }
 
@@ -191,11 +245,17 @@ namespace ConnectPro.Models
             return new AudioMessageDto
             {
                 Id = this.Id,
+                Description = this.Description,
                 Dirno = this.Dirno,
+                DirnoId = this.DirnoId,
+                DisplayName = this.DisplayName,
+                Duration = this.Duration,
+                FeatureType = this.FeatureType,
                 FileName = this.FileName,
                 FilePath = this.FilePath,
                 FileSize = this.FileSize,
-                Duration = this.Duration,
+                MessageId = this.MessageId,
+                Repetitions = this.Repetitions,
                 IsPlaying = this.IsPlaying
             };
         }
@@ -212,11 +272,17 @@ namespace ConnectPro.Models
             return new AudioMessage
             {
                 Id = dto.Id,
+                Description = dto.Description,
                 Dirno = dto.Dirno,
+                DirnoId = dto.DirnoId,
+                DisplayName = dto.DisplayName,
+                Duration = dto.Duration,
+                FeatureType = dto.FeatureType,
                 FileName = dto.FileName,
                 FilePath = dto.FilePath,
                 FileSize = dto.FileSize,
-                Duration = dto.Duration,
+                MessageId = dto.MessageId,
+                Repetitions = dto.Repetitions,
                 IsPlaying = dto.IsPlaying
             };
         }

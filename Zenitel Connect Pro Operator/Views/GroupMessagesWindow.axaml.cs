@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using ConnectPro.Models;
+using Microsoft.Extensions.DependencyInjection;
 using System.Windows.Input;
+using ZenitelConnectProOperator.Core.Abstractions;
 using ZenitelConnectProOperator.ViewModels;
 
 namespace ZenitelConnectProOperator.Views;
@@ -17,7 +19,8 @@ public partial class GroupMessagesWindow : Window
     public GroupMessagesWindow(Group group, GroupsViewModel ownerVm)
     {
         InitializeComponent();
-        var vm = new GroupMessagesViewModel(group);
+        var connectPro = App.Services.GetRequiredService<IConnectProService>();
+        var vm = new GroupMessagesViewModel(group, connectPro);
         vm.RequestClose += (_, _) => Close();
         DataContext = vm;
     }

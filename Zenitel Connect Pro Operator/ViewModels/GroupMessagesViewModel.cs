@@ -36,12 +36,24 @@ public partial class GroupMessagesViewModel : ObservableObject
     public GroupMessagesViewModel(Group group, IConnectProService connectPro) : this(group)
     {
         _connectPro = connectPro;
+        _connectPro.Core.Events.OnAudioMessagesChange += OnAudioMessagesChanged;
 
-        var msgs = _connectPro.Core.Collection.AudioMessages?.ToList() ?? new();
+        // Populate immediately if audio messages are already loaded
+        PopulateMessageList();
+    }
+
+    private void OnAudioMessagesChanged(object? sender, bool e)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(PopulateMessageList);
+    }
+
+    private void PopulateMessageList()
+    {
+        var msgs = _connectPro?.Core.Collection.AudioMessages?.ToList() ?? new();
+        AudioMessages.Clear();
         foreach (var m in msgs)
             AudioMessages.Add(new AudioMessageRowViewModel(m));
     }
-
     partial void OnNoRepeatChanged(bool value)
     {
         if (!value) return;
@@ -95,7 +107,7 @@ public partial class AudioMessageRowViewModel : ObservableObject
     public AudioMessage AudioMessage { get; }
 
     public string? Dirno => AudioMessage.Dirno;
-    public string? FileName => AudioMessage.FileName;
+    public string? DisplayName => AudioMessage.DisplayName;
 
     [ObservableProperty] private bool isPlaying;
 

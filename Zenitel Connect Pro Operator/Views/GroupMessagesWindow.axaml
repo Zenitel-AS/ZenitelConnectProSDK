@@ -32,25 +32,37 @@
     </Border>
 
     <Border Grid.Row="2" Padding="10" CornerRadius="8" BorderThickness="1">
-      <DataGrid ItemsSource="{Binding AudioMessages}"
-                AutoGenerateColumns="False"
-                IsReadOnly="True"
-                GridLinesVisibility="All">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="*"/>
-          <DataGridTextColumn Header="DIRNO" Binding="{Binding Dirno}" Width="120"/>
-
-          <DataGridTemplateColumn Header="Action" Width="120">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Button Content="{Binding PlayButtonText}"
-                        Command="{Binding TogglePlayCommand, RelativeSource={RelativeSource AncestorType=views:GroupMessagesWindow}}"
-                        CommandParameter="{Binding}"/>
+      <Grid RowDefinitions="Auto,*">
+        <Border Padding="4,6" Background="#0A000000">
+          <Grid ColumnDefinitions="*,120,120">
+            <TextBlock Grid.Column="0" Text="Display Name" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+            <TextBlock Grid.Column="1" Text="DIRNO" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+            <TextBlock Grid.Column="2" Text="Action" FontWeight="SemiBold" FontSize="12" Opacity="0.8"/>
+          </Grid>
+        </Border>
+        <ScrollViewer Grid.Row="1">
+          <ItemsControl ItemsSource="{Binding AudioMessages}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="2"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AudioMessageRowViewModel">
+                <Border Padding="4,6">
+                  <Grid ColumnDefinitions="*,120,120">
+                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Dirno}" VerticalAlignment="Center"/>
+                    <Button Grid.Column="2" Content="{Binding PlayButtonText}"
+                            Command="{Binding TogglePlayCommand, RelativeSource={RelativeSource AncestorType=views:GroupMessagesWindow}}"
+                            CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
               </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-        </DataGrid.Columns>
-      </DataGrid>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
     </Border>
 
     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">

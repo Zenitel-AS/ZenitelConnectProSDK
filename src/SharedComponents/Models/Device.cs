@@ -21,6 +21,16 @@ namespace ConnectPro.Models
         #region Fields
 
         /// <summary>
+        /// The current state of the device.
+        /// </summary>
+        public DeviceState? _deviceState = null;
+
+        /// <summary>
+        /// The previous state of the device.
+        /// </summary>
+        public DeviceState? _previousDeviceState = null;
+
+        /// <summary>
         /// The current call state of the device.
         /// </summary>
         public CallState? _callState = null;
@@ -69,8 +79,21 @@ namespace ConnectPro.Models
         /// <summary>
         /// Gets or sets the state indicating whether the device is reachable or not.
         /// </summary>
-        public DeviceState? DeviceState { get; set; } = null;
-
+        public DeviceState? DeviceState
+        {
+            get { return _deviceState; }
+            set
+            {
+                _deviceState = value;
+                if (_previousDeviceState != _deviceState)
+                {
+                    _previousDeviceState = _deviceState;
+                    if (_deviceState.HasValue)
+                        OnDeviceStateChange?.Invoke(this, _deviceState.Value);
+                }
+            }
+        }
+        
         /// <summary>
         /// Gets or sets the current call state of the device.
         /// </summary>
@@ -287,6 +310,12 @@ namespace ConnectPro.Models
         /// </summary>
         [NotMapped]
         public EventHandler<CallState> OnCallStateChange { get; set; }
+
+        /// <summary>
+        /// Occurs when the call state of the device changes.
+        /// </summary>
+        [NotMapped]
+        public EventHandler<DeviceState> OnDeviceStateChange { get; set; }
 
         #endregion
 
