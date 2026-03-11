@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using ConnectPro.Enums;
 using System.Collections.ObjectModel;
 using System.Net;
+using Timer = System.Timers.Timer;
 
 namespace ConnectPro.Handlers
 {
@@ -111,6 +112,10 @@ namespace ConnectPro.Handlers
         /// </summary>
        
         private readonly object _getAllCalsAndQueuesLock = new object();
+        private readonly object _queueRetrievalLock = new object();
+        private const double QueueReconcileIntervalMs = 5000;
+        private Timer QueueRetrievalTimer { get; set; }
+        private List<CallQueue> _configuredQueues = new List<CallQueue>();
 
         #endregion
 
@@ -121,6 +126,11 @@ namespace ConnectPro.Handlers
         /// </summary>
        
         public string ParentIpAddress { get; set; } = "";
+
+        /// <summary>
+        /// Indicates whether queue retrieval is currently being executed.
+        /// </summary>
+        public bool IsExecutingQueueRetrieval { get; set; } = false;
        
         /// <summary>
         /// Gets the operator device based on the operator's directory number.
@@ -176,6 +186,9 @@ namespace ConnectPro.Handlers
 
             _events.OnQueuesAndCallsSync += HandleQueuesAndCallsSync;
             _events.OnOperatorDirNoChange += HandleOperatorDirectoryNumberChange;
+            _events.OnConnectionChanged += HandleConnectionChange;
+
+            InitializeQueueRetrievalTimer();
         }
 
         #endregion
@@ -320,6 +333,45 @@ namespace ConnectPro.Handlers
         {
             _configuration.OperatorDirNo = dirNo;
             _operatorDirno = _configuration.OperatorDirNo;
+        }
+
+        private void HandleConnectionChange(object sender, bool isConnected)
+        {
+            if (isConnected)
+            {
+                StartQueueRetrievalTimer();
+                Task.Run(async () => await RetrieveQueues().ConfigureAwait(false));
+            }
+            else
+            {
+                StopQueueRetrievalTimer();
+
+                var hadRuntimeQueueItems = _collections.CallQueue.Count > 0;
+                _collections.CallQueue.Clear();
+
+                if (hadRuntimeQueueItems)
+                {
+                    _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
+                    _events.CallHandlerPopupRequested?.Invoke(this, false);
+                }
+
+                var removedQueues = _configuredQueues.ToList();
+                _configuredQueues.Clear();
+
+                if (removedQueues.Count > 0)
+                {
+                    foreach (var removedQueue in removedQueues)
+                        _events.OnQueueMemberRemoved?.Invoke(this, removedQueue);
+                }
+            }
+        }
+
+        private void OnQueueRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (!_wamp.IsConnected)
+                return;
+
+            Task.Run(async () => await RetrieveQueues().ConfigureAwait(false));
         }
 
         #endregion
@@ -678,14 +730,117 @@ namespace ConnectPro.Handlers
             return queues;
         }
 
+        public async Task RetrieveQueues()
+        {
+            lock (_queueRetrievalLock)
+            {
+                if (IsExecutingQueueRetrieval)
+                    return;
+
+                IsExecutingQueueRetrieval = true;
+            }
+
+            try
+            {
+                if (!_wamp.IsConnected)
+                    return;
+
+                var latestQueues = GetAllDefinedQueues() ?? new List<CallQueue>();
+
+                List<CallQueue> addedQueues;
+                List<CallQueue> removedQueues;
+
+                bool listChanged;
+
+                lock (_queueRetrievalLock)
+                {
+                    var existingQueues = _configuredQueues ?? new List<CallQueue>();
+
+                    CollectionReconciler.DiffByKey(
+                        existingQueues,
+                        latestQueues,
+                        GetConfiguredQueueKey,
+                        StringComparer.OrdinalIgnoreCase,
+                        out addedQueues,
+                        out removedQueues);
+
+                    listChanged = addedQueues.Count > 0 || removedQueues.Count > 0;
+
+                    if (listChanged)
+                        _configuredQueues = latestQueues;
+                }
+
+                if (listChanged)
+                {
+                    foreach (var addedQueue in addedQueues)
+                        _events.OnQueueMemberAdded?.Invoke(this, addedQueue);
+
+                    foreach (var removedQueue in removedQueues)
+                        _events.OnQueueMemberRemoved?.Invoke(this, removedQueue);
+                }
+            }
+            catch (Exception exe)
+            {
+                _events.OnExceptionThrown?.Invoke(this, exe);
+            }
+            finally
+            {
+                lock (_queueRetrievalLock)
+                {
+                    IsExecutingQueueRetrieval = false;
+                }
+            }
+        }
+
         public List<CallQueue> GetAllDefinedQueues(string queueDirno = "")
         {
             List<CallQueue> queues = new List<CallQueue>();
-            foreach (var call_queue_element in _wamp.requestQueuedCalls(queueDirno))
+            var configuredQueues = _wamp.requestQueuedCalls(queueDirno);
+            if (configuredQueues == null)
+                return queues;
+
+            foreach (var call_queue_element in configuredQueues)
             {
                 queues.Add(new CallQueue(call_queue_element));
             }
             return queues;
+        }
+
+        #endregion
+
+        #region Queue Monitoring Helpers
+
+        private static string GetConfiguredQueueKey(CallQueue queue)
+        {
+            if (queue == null)
+                return string.Empty;
+
+            return (queue.queue_dirno ?? string.Empty).ToLowerInvariant();
+        }
+
+        private void InitializeQueueRetrievalTimer()
+        {
+            if (QueueRetrievalTimer != null)
+                return;
+
+            QueueRetrievalTimer = new Timer(QueueReconcileIntervalMs);
+            QueueRetrievalTimer.AutoReset = true;
+            QueueRetrievalTimer.Elapsed += OnQueueRetrievalTimerElapsed;
+        }
+
+        private void StartQueueRetrievalTimer()
+        {
+            if (QueueRetrievalTimer == null)
+                InitializeQueueRetrievalTimer();
+
+            if (QueueRetrievalTimer != null && !QueueRetrievalTimer.Enabled)
+                QueueRetrievalTimer.Start();
+        }
+
+        private void StopQueueRetrievalTimer()
+        {
+            if (QueueRetrievalTimer != null && QueueRetrievalTimer.Enabled)
+                QueueRetrievalTimer.Stop();
         }
 
         #endregion
@@ -870,6 +1025,15 @@ namespace ConnectPro.Handlers
                 {
                     _events.OnQueuesAndCallsSync -= HandleQueuesAndCallsSync;
                     _events.OnOperatorDirNoChange -= HandleOperatorDirectoryNumberChange;
+                    _events.OnConnectionChanged -= HandleConnectionChange;
+                }
+
+                if (QueueRetrievalTimer != null)
+                {
+                    StopQueueRetrievalTimer();
+                    QueueRetrievalTimer.Elapsed -= OnQueueRetrievalTimerElapsed;
+                    QueueRetrievalTimer.Dispose();
+                    QueueRetrievalTimer = null;
                 }
 
                 // Dispose other managed resources here, if added later

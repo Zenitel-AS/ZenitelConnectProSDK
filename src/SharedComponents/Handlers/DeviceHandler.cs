@@ -30,6 +30,9 @@ namespace ConnectPro.Handlers
         /// Synchronization lock for device retrieval and registration operations.
         /// </summary>
         private readonly object _lockObj = new object();
+        private const double DeviceReconcileIntervalMs = 5000;
+        private bool _gpioListenersAttached = false;
+        private int _initialDeviceSyncCompleted = 0;
 
         /// <summary>
         /// Timer to periodically retrieve registered devices.
@@ -83,6 +86,8 @@ namespace ConnectPro.Handlers
             _events.OnDeviceRetrievalStart += HandleDeviceRetrievalStartEvent;
             _events.OnDeviceStateChange += HandleDeviceStateChange;
             _events.OnDeviceRetrievalEnd += AttachGPIOListeners;
+
+            InitializeDeviceRetrievalTimer();
         }
 
         #endregion
@@ -94,45 +99,66 @@ namespace ConnectPro.Handlers
         /// </summary>
         private void HandleDeviceRegistration(object sender, WampClient.wamp_device_registration_element ele)
         {
-            if (ele == null)
-                return;
+            if (ele == null) return;
 
-            // IMPORTANT: registration and retrieval both mutate the same list -> use the same lock.
+            bool listChanged = false;
+            Device addedDevice = null;
+
             lock (_lockObj)
             {
-                Device newDevice = new Device(ele, _gpioTransport); // Option A: Device owns its runtime GPIO
-
                 if (_collections.RegisteredDevices == null)
-                    _collections.RegisteredDevices = new List<Device>();
-
-                if (!_collections.RegisteredDevices.Any(x => x.device_ip == ele.device_ip))
                 {
+                    _collections.RegisteredDevices = new List<Device>();
+                }
+
+                var existing = _collections.RegisteredDevices.FirstOrDefault(x => x.device_ip == ele.device_ip);
+
+                if (existing == null)
+                {
+                    var newDevice = new Device(ele, _gpioTransport);
                     _collections.RegisteredDevices.Add(newDevice);
-                    _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
+                    addedDevice = newDevice;
+                    listChanged = true;
                 }
                 else
                 {
-                    Device existing = _collections.RegisteredDevices.FirstOrDefault(x => x.device_ip == ele.device_ip);
-                    if (existing != null)
-                    {
-                        // Dispose old GPIO runtime model before replacing.
-                        DetachGpio(existing);
+                    var hasChanges = HasDeviceChanged(existing, ele);
+                    var oldDirno = existing.dirno;
 
-                        _collections.RegisteredDevices.Remove(existing);
-                        _collections.RegisteredDevices.Add(newDevice);
-                        _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
+                    // update scalar fields + DeviceState (this triggers existing.OnDeviceStateChange)
+                    existing.SetValuesFromSDK(ele);
+
+                    // if routing key changed, rebind GPIO subscriptions
+                    if (!string.Equals(oldDirno, existing.dirno, StringComparison.OrdinalIgnoreCase))
+                    {
+                        DetachGpio(existing);
+                        AttachGpio(existing);
+                        hasChanges = true;
                     }
+
+                    listChanged = hasChanges;
                 }
             }
+
+            // NEVER invoke events under lock
+            if (addedDevice != null)
+                _events.OnDeviceAdded?.Invoke(this, addedDevice);
+
+            if (listChanged)
+                _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
         }
 
         private void AttachGPIOListeners(object sender, EventArgs e)
         {
+            if (_gpioListenersAttached)
+                return;
+
             //_events.OnChildLogEntry.Invoke(this, "Attaching GPIO Listeners");
 
             // Subscribe to global GPI/GPO events (single subscription for all devices)
             _wamp.TraceDeviceGPIStatusEvent();
             _wamp.TraceDeviceGPOStatusEvent();
+            _gpioListenersAttached = true;
         }
 
         /// <summary>
@@ -140,6 +166,15 @@ namespace ConnectPro.Handlers
         /// </summary>
         private void HandleDeviceRetrievalStartEvent(object sender, EventArgs e)
         {
+            StartDeviceRetrievalTimer();
+            Task.Run(async () => await RetrieveRegisteredDevices().ConfigureAwait(false));
+        }
+
+        private void OnDeviceRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (!_wamp.IsConnected)
+                return;
+
             Task.Run(async () => await RetrieveRegisteredDevices().ConfigureAwait(false));
         }
 
@@ -226,63 +261,128 @@ namespace ConnectPro.Handlers
         /// </summary>
         public async Task RetrieveRegisteredDevices()
         {
+            bool retrievalSucceeded = false;
+
             try
             {
-                // Guard: avoid concurrent retrievals
                 lock (_lockObj)
                 {
                     if (IsExecutingDeviceRetrieval)
                     {
-                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
+                        // end event outside lock later if you insist, but don’t spam
                         return;
                     }
                     IsExecutingDeviceRetrieval = true;
                 }
 
                 if (!_wamp.IsConnected)
-                {
-                    lock (_lockObj)
-                    {
-                        IsExecutingDeviceRetrieval = false;
-                        _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
-                    }
                     return;
-                }
 
-                // 1) Build devices + load GPIOs BEFORE touching RegisteredDevices
-                var loadedDevices = await BuildDevicesWithGpioLoadedAsync().ConfigureAwait(false);
+                // Snapshot from SDK (raw elements)
+                var elements = _wamp.requestRegisteredDevices() ?? new List<WampClient.wamp_device_registration_element>();
 
-                // 2) Swap list under lock, after disposing old GPIO subscriptions
+                bool listChanged = false;
+                var addedDevices = new List<Device>();
+                var removedDevices = new List<Device>();
+
                 lock (_lockObj)
                 {
-                    if (_collections.RegisteredDevices != null)
+                    if (_collections.RegisteredDevices == null)
                     {
-                        foreach (var old in _collections.RegisteredDevices)
-                            DetachGpio(old);
+                        _collections.RegisteredDevices = new List<Device>();
                     }
 
-                    _collections.RegisteredDevices = loadedDevices;
+                    // index existing by IP (stable key in your code)
+                    var existingByIp = _collections.RegisteredDevices
+                        .Where(d => !string.IsNullOrEmpty(d.device_ip))
+                        .ToDictionary(d => d.device_ip, StringComparer.OrdinalIgnoreCase);
+
+                    // mark seen
+                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var ele in elements)
+                    {
+                        if (ele?.device_ip == null) continue;
+
+                        seen.Add(ele.device_ip);
+
+                        if (existingByIp.TryGetValue(ele.device_ip, out var existing))
+                        {
+                            var hasChanges = HasDeviceChanged(existing, ele);
+                            var oldDirno = existing.dirno;
+
+                            existing.SetValuesFromSDK(ele);
+
+                            if (!string.Equals(oldDirno, existing.dirno, StringComparison.OrdinalIgnoreCase))
+                            {
+                                DetachGpio(existing);
+                                AttachGpio(existing);
+                                hasChanges = true;
+                            }
+
+                            if (hasChanges)
+                                listChanged = true;
+                        }
+                        else
+                        {
+                            var d = new Device(ele, _gpioTransport);
+                            _collections.RegisteredDevices.Add(d);
+                            addedDevices.Add(d);
+                            listChanged = true;
+                        }
+                    }
+
+                    // removals
+                    for (int i = _collections.RegisteredDevices.Count - 1; i >= 0; i--)
+                    {
+                        var d = _collections.RegisteredDevices[i];
+                        if (d?.device_ip == null) continue;
+
+                        if (!seen.Contains(d.device_ip))
+                        {
+                            DetachGpio(d);
+                            _collections.RegisteredDevices.RemoveAt(i);
+                            removedDevices.Add(d);
+                            listChanged = true;
+                        }
+                    }
+
+                    // keep your existing behavior
                     _events.OnQueuesAndCallsSync?.Invoke(this, EventArgs.Empty);
+                }
 
-                    if (_collections.RegisteredDevices != null)
-                        DeviceRetrievalTimer?.Stop();
+                if (addedDevices.Count > 0)
+                {
+                    foreach (var device in addedDevices)
+                        _events.OnDeviceAdded?.Invoke(this, device);
+                }
 
+                if (removedDevices.Count > 0)
+                {
+                    foreach (var device in removedDevices)
+                        _events.OnDeviceRemoved?.Invoke(this, device);
+                }
+
+                if (listChanged)
                     _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
 
-                    IsExecutingDeviceRetrieval = false;
-                    _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
-                }
+                retrievalSucceeded = true;
             }
             catch (Exception ex)
             {
-                lock (_lockObj)
-                {
-                    IsExecutingDeviceRetrieval = false;
-                    _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
-                }
-
                 _events.OnDebugChanged?.Invoke(this, (ex.Message, ex));
                 _events.OnExceptionThrown?.Invoke(this, ex);
+            }
+            finally
+            {
+                lock (_lockObj)
+                    IsExecutingDeviceRetrieval = false;
+
+                if (retrievalSucceeded &&
+                    Interlocked.CompareExchange(ref _initialDeviceSyncCompleted, 1, 0) == 0)
+                {
+                    _events.OnDeviceRetrievalEnd?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 
@@ -393,6 +493,60 @@ namespace ConnectPro.Handlers
             device.Gpio = new DeviceGpio(device.dirno, _gpioTransport);
         }
 
+        private bool HasDeviceChanged(Device existing, WampClient.wamp_device_registration_element ele)
+        {
+            if (existing == null || ele == null)
+                return true;
+
+            if (!string.Equals(existing.device_ip, ele.device_ip, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!string.Equals(existing.dirno, ele.dirno, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!string.Equals(existing.location, ele.location, StringComparison.Ordinal))
+                return true;
+
+            if (!string.Equals(existing.name, ele.name, StringComparison.Ordinal))
+                return true;
+
+            if (!string.Equals(existing.device_type, ele.device_type, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            Enums.DeviceState parsedState;
+            bool parsed = Enum.TryParse(ele.state, true, out parsedState);
+
+            if (parsed)
+                return existing.DeviceState != parsedState;
+
+            return existing.DeviceState.HasValue;
+        }
+
+        private void InitializeDeviceRetrievalTimer()
+        {
+            if (DeviceRetrievalTimer != null)
+                return;
+
+            DeviceRetrievalTimer = new Timer(DeviceReconcileIntervalMs);
+            DeviceRetrievalTimer.AutoReset = true;
+            DeviceRetrievalTimer.Elapsed += OnDeviceRetrievalTimerElapsed;
+        }
+
+        private void StartDeviceRetrievalTimer()
+        {
+            if (DeviceRetrievalTimer == null)
+                InitializeDeviceRetrievalTimer();
+
+            if (DeviceRetrievalTimer != null && !DeviceRetrievalTimer.Enabled)
+                DeviceRetrievalTimer.Start();
+        }
+
+        private void StopDeviceRetrievalTimer()
+        {
+            if (DeviceRetrievalTimer != null && DeviceRetrievalTimer.Enabled)
+                DeviceRetrievalTimer.Stop();
+        }
+
         private void DetachGpio(Device device)
         {
             if (device == null)
@@ -445,6 +599,7 @@ namespace ConnectPro.Handlers
                 {
                     _events.OnDeviceRetrievalStart -= HandleDeviceRetrievalStartEvent;
                     _events.OnDeviceStateChange -= HandleDeviceStateChange;
+                    _events.OnDeviceRetrievalEnd -= AttachGPIOListeners;
                 }
 
                 // Detach GPIO for all known devices
@@ -463,12 +618,15 @@ namespace ConnectPro.Handlers
                 {
                     _wamp.OnWampDeviceRegistrationEvent -= HandleDeviceRegistration;
                     _wamp.OnWampDeviceExtendedStatusEvent -= HandleDeviceExtendedStatus;
+                    _wamp.OnWampDeviceGPIStatusEventEx -= HandleDeviceGPIOStatusEvent;
+                    _wamp.OnWampDeviceGPOStatusEventEx -= HandleDeviceGPIOStatusEvent;
                 }
 
                 // Dispose timer
                 if (DeviceRetrievalTimer != null)
                 {
-                    DeviceRetrievalTimer.Stop();
+                    StopDeviceRetrievalTimer();
+                    DeviceRetrievalTimer.Elapsed -= OnDeviceRetrievalTimerElapsed;
                     DeviceRetrievalTimer.Dispose();
                     DeviceRetrievalTimer = null;
                 }

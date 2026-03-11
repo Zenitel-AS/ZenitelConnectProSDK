@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Wamp.Client;
 using Zenitel.IntegrationModule.REST;
+using Timer = System.Timers.Timer;
 
 namespace ConnectPro.Handlers
 {
@@ -23,6 +24,10 @@ namespace ConnectPro.Handlers
         private RestClient _rest;
         private object _lockObj = new object();
         private CancellationTokenSource _playbackCancellationTokenSource;
+        private const double GroupReconcileIntervalMs = 5000;
+        private const double AudioMessageReconcileIntervalMs = 5000;
+        private Timer GroupsRetrievalTimer { get; set; }
+        private Timer AudioMessagesRetrievalTimer { get; set; }
 
         /// <summary>
         /// Indicates whether group retrieval is currently being executed.
@@ -60,6 +65,8 @@ namespace ConnectPro.Handlers
             ParentIpAddress = parentIpAddress;
 
             _events.OnConnectionChanged += HandleConnectionChange;
+            InitializeGroupsRetrievalTimer();
+            InitializeAudioMessagesRetrievalTimer();
         }
 
         /// <summary>
@@ -71,6 +78,9 @@ namespace ConnectPro.Handlers
         {
             if (isConnected)
             {
+                StartGroupsRetrievalTimer();
+                StartAudioMessagesRetrievalTimer();
+
                 if (_collections.Groups.Count == 0)
                     Task.Run(async () => await RetrieveGroups());
                 if (_collections.AudioMessages.Count == 0)
@@ -78,12 +88,40 @@ namespace ConnectPro.Handlers
             }
             else
             {
+                StopGroupsRetrievalTimer();
+                StopAudioMessagesRetrievalTimer();
+
+                var removedGroups = _collections.Groups.ToList();
                 _collections.Groups.Clear();
+
+                var removedMessages = _collections.AudioMessages.ToList();
                 _collections.AudioMessages.Clear();
 
-                _events.OnGroupsListChange?.Invoke(this, new EventArgs());
-                _events.OnAudioMessagesChange?.Invoke(this, false);
+                foreach (var removedMessage in removedMessages)
+                    _events.OnAudioMessageRemoved?.Invoke(this, removedMessage);
+
+                if (removedGroups.Count > 0)
+                    _events.OnGroupsListChange?.Invoke(this, new EventArgs());
+
+                if (removedMessages.Count > 0)
+                    _events.OnAudioMessagesChange?.Invoke(this, false);
             }
+        }
+
+        private void OnGroupsRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (!_wamp.IsConnected)
+                return;
+
+            Task.Run(async () => await RetrieveGroups().ConfigureAwait(false));
+        }
+
+        private void OnAudioMessagesRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (!_wamp.IsConnected)
+                return;
+
+            Task.Run(async () => await RetrieveAudioMessages().ConfigureAwait(false));
         }
 
         /// <summary>
@@ -105,14 +143,43 @@ namespace ConnectPro.Handlers
                 {
                     var groups = GetGroups().ToList();
                     await FillGroupMembersFromRestAsync(groups);
-                    _collections.Groups = groups;
-                    _events.OnGroupsListChange?.Invoke(this, new EventArgs());
+
+                    bool listChanged;
+                    List<Group> addedGroups;
+                    List<Group> removedGroups;
+
+                    lock (_lockObj)
+                    {
+                        var existingGroups = _collections.Groups ?? new List<Group>();
+
+                        var updated = CollectionReconciler.DiffByKey(
+                            existingGroups,
+                            groups,
+                            GetGroupKey,
+                            StringComparer.OrdinalIgnoreCase,
+                            HasGroupChanged,
+                            out addedGroups,
+                            out removedGroups);
+
+                        listChanged = addedGroups.Count > 0 || removedGroups.Count > 0 || updated;
+                        _collections.Groups = groups;
+                    }
+
+                    if (listChanged)
+                    {
+                        foreach (var addedGroup in addedGroups)
+                            _events.OnGroupAdded?.Invoke(this, addedGroup);
+
+                        foreach (var removedGroup in removedGroups)
+                            _events.OnGroupRemoved?.Invoke(this, removedGroup);
+
+                        _events.OnGroupsListChange?.Invoke(this, new EventArgs());
+                    }
                 }
             }
             catch (Exception exe)
             {
                 _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
-                _events.OnGroupsListChange?.Invoke(this, new EventArgs());
                 _events.OnExceptionThrown?.Invoke(this, exe);
             }
             finally
@@ -205,29 +272,158 @@ namespace ConnectPro.Handlers
         {
             await Task.Run(() =>
             {
+                List<AudioMessage> addedMessages = new List<AudioMessage>();
+                List<AudioMessage> removedMessages = new List<AudioMessage>();
+                bool listChanged = false;
+
                 lock (_lockObj)
                 {
+                    if (IsExecutingAudioMessagesRetrieval)
+                        return;
+
+                    IsExecutingAudioMessagesRetrieval = true;
+                }
+
+                try
+                {
+                    if (_wamp.IsConnected)
                     try
                     {
-                        if (!IsExecutingAudioMessagesRetrieval)
+                        var latestMessages = GetAudioMessages().AudioMessages?.ToList() ?? new List<AudioMessage>();
+
+                        lock (_lockObj)
                         {
-                            IsExecutingAudioMessagesRetrieval = true;
-                            if (_wamp.IsConnected)
-                            {
-                                _collections.AudioMessages = GetAudioMessages().AudioMessages.ToList();
-                                _events.OnAudioMessagesChange?.Invoke(this, false);
-                            }
-                            IsExecutingAudioMessagesRetrieval = false;
+                            var existingMessages = _collections.AudioMessages ?? new List<AudioMessage>();
+
+                            CollectionReconciler.DiffByKey(
+                                existingMessages,
+                                latestMessages,
+                                GetAudioMessageKey,
+                                StringComparer.OrdinalIgnoreCase,
+                                out addedMessages,
+                                out removedMessages);
+
+                            listChanged = addedMessages.Count > 0 || removedMessages.Count > 0;
+
+                            _collections.AudioMessages = latestMessages;
                         }
+
+                        foreach (var addedMessage in addedMessages)
+                            _events.OnAudioMessageAdded?.Invoke(this, addedMessage);
+
+                        foreach (var removedMessage in removedMessages)
+                            _events.OnAudioMessageRemoved?.Invoke(this, removedMessage);
+
+                        if (listChanged)
+                            _events.OnAudioMessagesChange?.Invoke(this, false);
                     }
                     catch (Exception exe)
                     {
                         _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
-                        _events.OnAudioMessagesChange?.Invoke(this, false);
                         _events.OnExceptionThrown?.Invoke(this, exe);
                     }
                 }
+                finally
+                {
+                    lock (_lockObj)
+                    {
+                        IsExecutingAudioMessagesRetrieval = false;
+                    }
+                }
             });
+        }
+
+        private static string GetAudioMessageKey(AudioMessage audioMessage)
+        {
+            if (audioMessage == null)
+                return string.Empty;
+
+            return (audioMessage.MessageId.ToString() + "|"
+                + (audioMessage.Dirno ?? string.Empty) + "|"
+                + (audioMessage.FilePath ?? string.Empty) + "|"
+                + (audioMessage.FileName ?? string.Empty))
+                .ToLowerInvariant();
+        }
+
+        private static string GetGroupKey(Group group)
+        {
+            if (group == null)
+                return string.Empty;
+
+            return (group.Dirno ?? string.Empty).ToLowerInvariant();
+        }
+
+        private static bool HasGroupChanged(Group existing, Group latest)
+        {
+            if (existing == null || latest == null)
+                return true;
+
+            if (!string.Equals(existing.Dirno, latest.Dirno, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!string.Equals(existing.DisplayName, latest.DisplayName, StringComparison.Ordinal))
+                return true;
+
+            if (!string.Equals(existing.Priority, latest.Priority, StringComparison.Ordinal))
+                return true;
+
+            var existingMembers = existing.Members ?? Array.Empty<string>();
+            var latestMembers = latest.Members ?? Array.Empty<string>();
+
+            if (existingMembers.Length != latestMembers.Length)
+                return true;
+
+            return !existingMembers.SequenceEqual(latestMembers, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private void InitializeGroupsRetrievalTimer()
+        {
+            if (GroupsRetrievalTimer != null)
+                return;
+
+            GroupsRetrievalTimer = new Timer(GroupReconcileIntervalMs);
+            GroupsRetrievalTimer.AutoReset = true;
+            GroupsRetrievalTimer.Elapsed += OnGroupsRetrievalTimerElapsed;
+        }
+
+        private void StartGroupsRetrievalTimer()
+        {
+            if (GroupsRetrievalTimer == null)
+                InitializeGroupsRetrievalTimer();
+
+            if (GroupsRetrievalTimer != null && !GroupsRetrievalTimer.Enabled)
+                GroupsRetrievalTimer.Start();
+        }
+
+        private void StopGroupsRetrievalTimer()
+        {
+            if (GroupsRetrievalTimer != null && GroupsRetrievalTimer.Enabled)
+                GroupsRetrievalTimer.Stop();
+        }
+
+        private void InitializeAudioMessagesRetrievalTimer()
+        {
+            if (AudioMessagesRetrievalTimer != null)
+                return;
+
+            AudioMessagesRetrievalTimer = new Timer(AudioMessageReconcileIntervalMs);
+            AudioMessagesRetrievalTimer.AutoReset = true;
+            AudioMessagesRetrievalTimer.Elapsed += OnAudioMessagesRetrievalTimerElapsed;
+        }
+
+        private void StartAudioMessagesRetrievalTimer()
+        {
+            if (AudioMessagesRetrievalTimer == null)
+                InitializeAudioMessagesRetrievalTimer();
+
+            if (AudioMessagesRetrievalTimer != null && !AudioMessagesRetrievalTimer.Enabled)
+                AudioMessagesRetrievalTimer.Start();
+        }
+
+        private void StopAudioMessagesRetrievalTimer()
+        {
+            if (AudioMessagesRetrievalTimer != null && AudioMessagesRetrievalTimer.Enabled)
+                AudioMessagesRetrievalTimer.Stop();
         }
 
         /// <summary>
@@ -336,6 +532,22 @@ namespace ConnectPro.Handlers
                 if (_events != null)
                 {
                     _events.OnConnectionChanged -= HandleConnectionChange;
+                }
+
+                if (AudioMessagesRetrievalTimer != null)
+                {
+                    StopAudioMessagesRetrievalTimer();
+                    AudioMessagesRetrievalTimer.Elapsed -= OnAudioMessagesRetrievalTimerElapsed;
+                    AudioMessagesRetrievalTimer.Dispose();
+                    AudioMessagesRetrievalTimer = null;
+                }
+
+                if (GroupsRetrievalTimer != null)
+                {
+                    StopGroupsRetrievalTimer();
+                    GroupsRetrievalTimer.Elapsed -= OnGroupsRetrievalTimerElapsed;
+                    GroupsRetrievalTimer.Dispose();
+                    GroupsRetrievalTimer = null;
                 }
 
                 // Dispose CancellationTokenSource

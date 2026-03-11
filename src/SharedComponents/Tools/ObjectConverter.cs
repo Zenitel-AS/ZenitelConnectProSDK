@@ -1,5 +1,7 @@
 ﻿using ConnectPro.Models;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Wamp.Client;
 
 namespace ConnectPro.Tools
@@ -89,5 +91,100 @@ namespace ConnectPro.Tools
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Provides utility methods for reconciling two collections by key.
+    /// </summary>
+    public static class CollectionReconciler
+    {
+        /// <summary>
+        /// Computes added, removed and updated members between existing and latest collections.
+        /// </summary>
+        /// <typeparam name="TItem">The item type.</typeparam>
+        /// <typeparam name="TKey">The key type.</typeparam>
+        /// <param name="existingItems">The existing collection snapshot.</param>
+        /// <param name="latestItems">The latest collection snapshot.</param>
+        /// <param name="keySelector">A function that returns a stable key for each item.</param>
+        /// <param name="keyComparer">The key comparer.</param>
+        /// <param name="hasChanged">Optional function used to detect member updates.</param>
+        /// <param name="addedItems">Outputs members that only exist in latest snapshot.</param>
+        /// <param name="removedItems">Outputs members that only exist in existing snapshot.</param>
+        /// <returns><c>true</c> if any member update was detected for matching keys; otherwise <c>false</c>.</returns>
+        public static bool DiffByKey<TItem, TKey>(
+            IEnumerable<TItem> existingItems,
+            IEnumerable<TItem> latestItems,
+            Func<TItem, TKey> keySelector,
+            IEqualityComparer<TKey> keyComparer,
+            Func<TItem, TItem, bool> hasChanged,
+            out List<TItem> addedItems,
+            out List<TItem> removedItems)
+        {
+            if (keySelector == null)
+                throw new ArgumentNullException(nameof(keySelector));
+
+            var comparer = keyComparer ?? EqualityComparer<TKey>.Default;
+            var existingByKey = new Dictionary<TKey, TItem>(comparer);
+
+            if (existingItems != null)
+            {
+                foreach (var item in existingItems)
+                {
+                    if (item == null)
+                        continue;
+
+                    var key = keySelector(item);
+                    if (!existingByKey.ContainsKey(key))
+                        existingByKey.Add(key, item);
+                }
+            }
+
+            var latestSeen = new HashSet<TKey>(comparer);
+            addedItems = new List<TItem>();
+            var hasUpdates = false;
+
+            if (latestItems != null)
+            {
+                foreach (var item in latestItems)
+                {
+                    if (item == null)
+                        continue;
+
+                    var key = keySelector(item);
+                    if (!latestSeen.Add(key))
+                        continue;
+
+                    TItem existing;
+                    if (existingByKey.TryGetValue(key, out existing))
+                    {
+                        if (hasChanged != null && hasChanged(existing, item))
+                            hasUpdates = true;
+
+                        existingByKey.Remove(key);
+                    }
+                    else
+                    {
+                        addedItems.Add(item);
+                    }
+                }
+            }
+
+            removedItems = existingByKey.Values.ToList();
+            return hasUpdates;
+        }
+
+        /// <summary>
+        /// Computes added and removed members between existing and latest collections by key.
+        /// </summary>
+        public static void DiffByKey<TItem, TKey>(
+            IEnumerable<TItem> existingItems,
+            IEnumerable<TItem> latestItems,
+            Func<TItem, TKey> keySelector,
+            IEqualityComparer<TKey> keyComparer,
+            out List<TItem> addedItems,
+            out List<TItem> removedItems)
+        {
+            DiffByKey(existingItems, latestItems, keySelector, keyComparer, null, out addedItems, out removedItems);
+        }
     }
 }

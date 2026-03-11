@@ -89,7 +89,7 @@ namespace ConnectPro.Models
                 {
                     _previousDeviceState = _deviceState;
                     if (_deviceState.HasValue)
-                        OnDeviceStateChange?.Invoke(this, _deviceState.Value);
+                        DeviceStateChanged?.Invoke(this, _deviceState.Value);
                 }
             }
         }
@@ -314,8 +314,7 @@ namespace ConnectPro.Models
         /// <summary>
         /// Occurs when the call state of the device changes.
         /// </summary>
-        [NotMapped]
-        public EventHandler<DeviceState> OnDeviceStateChange { get; set; }
+        public event EventHandler<DeviceState> DeviceStateChanged;
 
         #endregion
 

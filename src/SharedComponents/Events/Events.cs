@@ -55,6 +55,16 @@ namespace ConnectPro
         public EventHandler OnDeviceListChange { get; set; }
 
         /// <summary>
+        /// Occurs when a new device is discovered and added to the registered device list.
+        /// </summary>
+        public EventHandler<Device> OnDeviceAdded { get; set; }
+
+        /// <summary>
+        /// Occurs when a device is removed from the registered device list.
+        /// </summary>
+        public EventHandler<Device> OnDeviceRemoved { get; set; }
+
+        /// <summary>
         /// Occurs when the state of a device in the list changes.
         /// </summary>
         public EventHandler<CallElement> OnDeviceStateChange { get; set; }
@@ -88,6 +98,16 @@ namespace ConnectPro
         /// Occurs when a call manipulation has been reported from wamp.
         /// </summary>
         public EventHandler<CallElement> OnCallEvent { get; set; }
+
+        /// <summary>
+        /// Occurs when a configured queue is added.
+        /// </summary>
+        public EventHandler<CallQueue> OnQueueMemberAdded { get; set; }
+
+        /// <summary>
+        /// Occurs when a configured queue is removed.
+        /// </summary>
+        public EventHandler<CallQueue> OnQueueMemberRemoved { get; set; }
 
         #endregion
 
@@ -175,6 +195,16 @@ namespace ConnectPro
         public EventHandler OnGroupsListChange { get; set; }
 
         /// <summary>
+        /// Occurs when a group is added to the list.
+        /// </summary>
+        public EventHandler<Group> OnGroupAdded { get; set; }
+
+        /// <summary>
+        /// Occurs when a group is removed from the list.
+        /// </summary>
+        public EventHandler<Group> OnGroupRemoved { get; set; }
+
+        /// <summary>
         /// Occurs when a group broadcast update is received.
         /// </summary>
         public EventHandler<object> OnGroupsMsgUpdate { get; set; }
@@ -188,6 +218,16 @@ namespace ConnectPro
         /// Occurs when an audio message is updated.
         /// </summary>
         public EventHandler<bool> OnAudioMessagesChange { get; set; }
+
+        /// <summary>
+        /// Occurs when an audio message is added to the list.
+        /// </summary>
+        public EventHandler<AudioMessage> OnAudioMessageAdded { get; set; }
+
+        /// <summary>
+        /// Occurs when an audio message is removed from the list.
+        /// </summary>
+        public EventHandler<AudioMessage> OnAudioMessageRemoved { get; set; }
 
         /// <summary>
         /// Occurs when the call forwarding rules list changes.
