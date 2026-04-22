@@ -1,4 +1,5 @@
 ﻿using ConnectPro.Models;
+using ConnectPro.Models.AccessControl;
 using ConnectPro.Models.AudioAnalytics;
 using System;
 using Wamp.Client;
@@ -212,7 +213,7 @@ namespace ConnectPro
         /// <summary>
         /// Occurs when a door open event is detected.
         /// </summary>
-        public EventHandler<bool> OnDoorOpen { get; set; }
+        public EventHandler<OpenDoorEventData> OnDoorOpen { get; set; }
 
         /// <summary>
         /// Occurs when an audio message is updated.

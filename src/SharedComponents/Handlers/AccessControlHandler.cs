@@ -51,13 +51,15 @@ namespace ConnectPro.Handlers
             {
                 OpenDoorEventData = new OpenDoorEventData()
                 {
+                    IsSuccess = true,
                     FromDirno = doorOpenEvent.from_dirno,
-                    DoorDirno = doorOpenEvent.door_dirno
+                    DoorDirno = doorOpenEvent.door_dirno,
+                    EventInformationMessage = "Handling wamp_open_door_event Event"
                 };
                 OpenDoorEventData.TrySetLastEventTimestamp();
 
                 Console.WriteLine($"Door opened! From dirno: {doorOpenEvent.from_dirno} Door dirno: {doorOpenEvent.door_dirno}");
-                _events.OnDoorOpen?.Invoke(this, true);
+                _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
             }
         }
 
@@ -77,15 +79,19 @@ namespace ConnectPro.Handlers
                     OpenDoorEventData = new OpenDoorEventData()
                     {
                         FromDirno =  operatorDirNo,
-                        DoorDirno = ele.dirno
+                        DoorDirno = ele.dirno,
+                        EventInformationMessage = response.CompletionText
                     };
                     OpenDoorEventData.TrySetLastEventTimestamp();
 
-                    _events.OnDoorOpen?.Invoke(this, true);
+                    OpenDoorEventData.IsSuccess = true;
+                    _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
                 }
                 else
                 {
-                    _events.OnDoorOpen?.Invoke(this, false);
+                    OpenDoorEventData.EventInformationMessage = response.CompletionText;
+                    OpenDoorEventData.IsSuccess = false;
+                    _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
                 }
             }
         }

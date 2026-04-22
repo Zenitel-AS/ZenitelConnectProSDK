@@ -5,6 +5,10 @@ namespace ConnectPro.Models.AccessControl
     public class OpenDoorEventData
     {
         /// <summary>
+        /// Gets or sets a value indicating whether the operation was successful.
+        /// </summary>
+        public bool IsSuccess { get; set; } = false;
+        /// <summary>
         /// Caller directory number (operator who opened the door).
         /// </summary>
         public string FromDirno { get; set; } = "";
@@ -24,6 +28,11 @@ namespace ConnectPro.Models.AccessControl
         /// Initialized to 0 (meaning "not set").
         /// </summary>
         public long LastEventTimestamp { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the response message.
+        /// </summary>
+        public string EventInformationMessage { get; set; } = "";
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OpenDoorEventData"/> class.

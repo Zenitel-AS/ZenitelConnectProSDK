@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ConnectPro.Enums;
 using ConnectPro.Models;
+using ConnectPro.Models.AccessControl;
 using ConnectPro.Models.GPIO;
 using Wamp.Client;
 using ZenitelConnectProOperator.Core.Abstractions;
@@ -39,8 +40,19 @@ public partial class DeviceListViewModel : ObservableObject, IDisposable
         _connectPro.Core.Events.OnDeviceListChange += OnDevicesChanged;
         _connectPro.Core.Events.OnOperatorDirNoChange += OnOperatorChanged;
         _connectPro.Core.Events.OnGpioEvent += HandleGpioEvent;
+        _connectPro.Core.Events.OnDoorOpen += HandleDoorOpenEvent;
 
         QueueRefresh();
+    }
+
+    private void HandleDoorOpenEvent(object? sender, OpenDoorEventData eventData)
+    {
+        var time = eventData.EventTime;
+        var lastEventTime = eventData.LastEventTimestamp;
+        var doorDIrno = eventData.DoorDirno;
+        var fromDirno = eventData.FromDirno;
+        var isPostSuccess = eventData.IsSuccess; // This one is used only when POST-ing the event to ZCP
+        var eventInformation = eventData.EventInformationMessage;
     }
 
     private void OnDevicesChanged(object? sender, EventArgs e) => QueueRefresh();
@@ -130,7 +142,7 @@ public partial class DeviceListViewModel : ObservableObject, IDisposable
             vm?.UpdateGpioFromEvent(updatedPoint);
         });
     }
-
+    
     private static GpioState ParseGpioState(WampClient.wamp_device_gpio_element element)
     {
         // Primary: use "state" field when present ("low"/"high")
