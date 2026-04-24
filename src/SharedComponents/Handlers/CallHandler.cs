@@ -421,6 +421,15 @@ namespace ConnectPro.Handlers
                                 $"PostCall succeeded, but DeleteCall failed: {deleteResponse.CompletionText}";
                         }
 
+                        if(callResponse.Success)
+                        {
+                            var callElements = GetAllCalls(from_dir).GetAwaiter().GetResult();
+                            if (callElements != null && callElements.Count > 0)
+                            {
+                                _events.OnMakeCallEvent?.Invoke(this, callElements[0]);
+                            }
+                        }
+
                         return callResponse;
                     }
                     catch (Exception ex)
@@ -447,7 +456,12 @@ namespace ConnectPro.Handlers
                     {
                         if (_collections.ActiveCalls.FirstOrDefault(x => x.dirno == device.dirno) == null)
                         {
+                            CallElement call = GetAllCalls(device.dirno).GetAwaiter().GetResult().FirstOrDefault();
                             _collections.ActiveCalls.Add(device);
+                            if (call != null)
+                            {
+                                _events.OnActiveCallAdded?.Invoke(this, call);
+                            }
                             this.ActiveDevice = device;
                             _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
                             _events.OnActiveCallListValueChange?.Invoke(this, new EventArgs());
@@ -474,7 +488,9 @@ namespace ConnectPro.Handlers
                         try
                         {
                             _collections.ActiveCalls.Remove(device);
+                                
                             this.ActiveDevice = null;
+                            _events.OnActiveCallRemoved?.Invoke(this, device);
                             _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
                             _events.OnActiveCallListValueChange?.Invoke(this, EventArgs.Empty);
                             _events.CallHandlerPopupRequested?.Invoke(this, false);
@@ -536,6 +552,7 @@ namespace ConnectPro.Handlers
                 {
                     ActiveDevice = _collections.RegisteredDevices
                         .FirstOrDefault(x => x.dirno == fromDirno);
+                    _events.OnCallAnswered?.Invoke(this, queuedDevice);
                 }
             }
 
@@ -562,6 +579,7 @@ namespace ConnectPro.Handlers
                             {
                                 _collections.CallQueue.Add(callLeg);
                                 this.ActiveDevice = _collections.RegisteredDevices.FirstOrDefault(x => (x.dirno == callLeg.from_dirno));
+                                _events.OnQueuedCallAdded?.Invoke(this, callLeg);
                                 _events.OnCallQueueListValueChange?.Invoke(this, new EventArgs());
                                 _events.CallHandlerPopupRequested?.Invoke(this, true);
                             }
@@ -596,6 +614,7 @@ namespace ConnectPro.Handlers
                             {
                                 _collections.CallQueue.Remove(callLegElement);
                                 this.ActiveDevice = _collections.ActiveCalls.FirstOrDefault();
+                                _events.OnQueuedCallRemoved?.Invoke(this, callLegElement);
                                 _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
                                 _events.CallHandlerPopupRequested?.Invoke(this, false);
                             }
@@ -629,6 +648,7 @@ namespace ConnectPro.Handlers
                             {
                                 _collections.CallQueue.Remove(callLegElement);
                                 this.ActiveDevice = _collections.ActiveCalls.FirstOrDefault();
+                                _events.OnQueuedCallRemoved?.Invoke(this, callLegElement);
                                 _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
                                 _events.CallHandlerPopupRequested?.Invoke(this, false);
                             }
@@ -924,6 +944,12 @@ namespace ConnectPro.Handlers
                     {
                         var response = _wamp.DeleteCallId(call.CallId.ToString());
 
+                        if (response != null && response.WampResponse == ResponseType.WampRequestSucceeded)
+                        {
+                            call.CallState = CallState.ended;
+                            _events.OnCallDeleted?.Invoke(this, call);
+                        }
+
                         var mapped = CallResponse.FromWampResponse(response);
 
                         if (!mapped.Success)
@@ -993,6 +1019,13 @@ namespace ConnectPro.Handlers
                                     response = _wamp.DeleteCalls(dirno);
                                 }
 
+                                if (response != null &&
+                                   response.WampResponse == ResponseType.WampRequestSucceeded)
+                                {
+                                    activeCall.state = CallState.ended.ToString();
+                                    _events.OnCallDeleted?.Invoke(this, (new CallElement(activeCall)));
+                                }
+
                                 _events.OnCallLogEntryRequested?.Invoke(this, activeCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
 
@@ -1014,6 +1047,13 @@ namespace ConnectPro.Handlers
                                     response.WampResponse != ResponseType.WampRequestSucceeded)
                                 {
                                     response = _wamp.DeleteCalls(dirno);
+                                }
+
+                                if (response != null &&
+                                  response.WampResponse == ResponseType.WampRequestSucceeded)
+                                {
+                                    queuedCall.state = CallState.ended.ToString();
+                                    _events.OnQueuedCallRemoved?.Invoke(this, (new CallLegElement(queuedCall)));
                                 }
 
                                 _events.OnCallLogEntryRequested?.Invoke(this, queuedCall);
@@ -1062,6 +1102,15 @@ namespace ConnectPro.Handlers
                     }
 
                     wamp_response response = _wamp.DeleteCallId(callId.ToString());
+
+                    if (response != null &&
+                        response.WampResponse == ResponseType.WampRequestSucceeded &&
+                        calls != null &&
+                        calls.Count > 0)
+                    {
+                        calls[0].CallState = CallState.ended;
+                        _events.OnCallDeleted?.Invoke(this, calls[0]);
+                    }
 
                     _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
 

@@ -101,6 +101,41 @@ namespace ConnectPro
         public EventHandler<CallElement> OnCallEvent { get; set; }
 
         /// <summary>
+        /// Occurs when a call is initiated.
+        /// </summary>
+        public EventHandler<CallElement> OnMakeCallEvent { get; set; }
+
+        /// <summary>
+        /// Occurs when an active call is added.
+        /// </summary>
+        public EventHandler<CallElement> OnActiveCallAdded { get; set; }
+
+        /// <summary>
+        /// Gets or sets the event handler invoked when an active call is removed.
+        /// </summary>
+        public EventHandler<Device> OnActiveCallRemoved { get; set; }
+
+        /// <summary>
+        /// Gets or sets the event handler invoked when a call is deleted.
+        /// </summary>
+        public EventHandler<CallElement> OnCallDeleted { get; set; }
+
+        /// <summary>
+        /// Occurs when a queued call is added.
+        /// </summary>
+        public EventHandler<CallLegElement> OnQueuedCallAdded { get; set; }
+
+        /// <summary>
+        /// Occurs when a queued call is removed.
+        /// </summary>
+        public EventHandler<CallLegElement> OnQueuedCallRemoved { get; set; }
+
+        /// <summary>
+        /// Occurs when a queued call is answered.
+        /// </summary>
+        public EventHandler<CallLegElement> OnCallAnswered { get; set; }
+
+        /// <summary>
         /// Occurs when a configured queue is added.
         /// </summary>
         public EventHandler<CallQueue> OnQueueMemberAdded { get; set; }
