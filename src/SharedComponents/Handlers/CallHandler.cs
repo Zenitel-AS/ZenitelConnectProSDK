@@ -1,19 +1,21 @@
-﻿using ConnectPro.Models;
+﻿using ConnectPro.Enums;
+using ConnectPro.Models;
+using ConnectPro.Models.Responses;
 using ConnectPro.Tools;
+using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using static Wamp.Client.WampClient;
 using Wamp.Client;
-using Microsoft.Extensions.Logging.Abstractions;
-using System.Collections;
-using System.Runtime.CompilerServices;
-using ConnectPro.Enums;
-using System.Collections.ObjectModel;
-using System.Net;
+using static Wamp.Client.WampClient;
 using Timer = System.Timers.Timer;
 
 namespace ConnectPro.Handlers
@@ -22,7 +24,7 @@ namespace ConnectPro.Handlers
     /// Manages call handling operations, including active and queued calls, 
     /// interactions with the WAMP client, and synchronization of call data.
     /// </summary>
-   
+
     public class CallHandler : IDisposable
     {
         #region Fields & Locks
@@ -30,87 +32,87 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Stores a reference to the collections object, managing calls and devices.
         /// </summary>
-     
+
         private Collections _collections;
-      
+
         /// <summary>
         /// Stores a reference to the events object, handling various call-related events.
         /// </summary>
-      
+
         private Events _events;
-      
+
         /// <summary>
         /// Stores a reference to the WAMP client, enabling communication with the system.
         /// </summary>
-      
+
         private WampClient _wamp;
-      
+
         /// <summary>
         /// Stores a reference to the configuration object, maintaining, connection information, operator, and device settings.
         /// </summary>
-      
+
         private Configuration _configuration;
-       
+
         /// <summary>
         /// Stores the directory number of the operator.
         /// </summary>
-       
+
         private string _operatorDirno;
 
         private bool IsHandlingCallStatusChange { get; set; } = false;
-      
+
         /// <summary>
         /// Lock object to synchronize posting new calls.
         /// </summary>
-      
+
         private readonly object _postCallLock = new object();
-     
+
         /// <summary>
         /// Lock object to synchronize deletion of all calls.
         /// </summary>
-      
+
         private readonly object _deleteAllCallLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize deletion of a specific call.
         /// </summary>
-      
+
         private readonly object _deleteCallLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize adding a call to the active calls list.
         /// </summary>
-     
+
         private readonly object _addToActiveCallsLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize removing a call from the active calls list.
         /// </summary>
-      
+
         private readonly object _removeFromActiveCallLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize answering a queued call.
         /// </summary>
-      
+
         private readonly object _answerQueuedCallLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize adding a call to the queued calls list.
         /// </summary>
-      
+
         private readonly object _addToQueuedCallsLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize removing a call from the queued calls list.
         /// </summary>
-      
+
         private readonly object _removeFromQueuedCallsLock = new object();
-      
+
         /// <summary>
         /// Lock object to synchronize retrieving all calls and queued calls.
         /// </summary>
-       
+
         private readonly object _getAllCalsAndQueuesLock = new object();
         private readonly object _queueRetrievalLock = new object();
         private const double QueueReconcileIntervalMs = 5000;
@@ -124,18 +126,18 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Gets or sets the IP address of the parent device.
         /// </summary>
-       
+
         public string ParentIpAddress { get; set; } = "";
 
         /// <summary>
         /// Indicates whether queue retrieval is currently being executed.
         /// </summary>
         public bool IsExecutingQueueRetrieval { get; set; } = false;
-       
+
         /// <summary>
         /// Gets the operator device based on the operator's directory number.
         /// </summary>
-       
+
         public Device Operator
         {
             get
@@ -151,11 +153,11 @@ namespace ConnectPro.Handlers
                 return null;
             }
         }
-       
+
         /// <summary>
         /// Gets or sets the currently active device.
         /// </summary>
-      
+
         public Device ActiveDevice { get; set; }
 
         #endregion
@@ -170,7 +172,7 @@ namespace ConnectPro.Handlers
         /// <param name="wamp">Reference to the WAMP client for communication.</param>
         /// <param name="configuration">Reference to the configuration object.</param>
         /// <param name="parentIpAddress">The IP address of the parent device.</param>
-       
+
         public CallHandler(ref Collections collections, ref Events events, ref WampClient wamp, ref Configuration configuration, string parentIpAddress)
         {
             _collections = collections;
@@ -200,7 +202,7 @@ namespace ConnectPro.Handlers
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="call_Element">The call element containing the updated call information.</param>
-       
+
         private void HandleCallStatusChangedEvent(object sender, WampClient.wamp_call_element call_Element)
         {
             CallElement callElement = new CallElement(call_Element);
@@ -268,13 +270,13 @@ namespace ConnectPro.Handlers
                 UpdateGroupBusyFromCall(callElement);
             }
         }
-       
+
         /// <summary>
         /// Handles changes in the call queue and updates the queued calls collection.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="callQueueElement">The call leg element containing the updated queue information.</param>
-       
+
         private void HandleCallQueueChange(object sender, WampClient.wamp_call_leg_element callQueueElement)
         {
             try
@@ -311,24 +313,24 @@ namespace ConnectPro.Handlers
                 _events.OnExceptionThrown?.Invoke(this, exe);
             }
         }
-       
+
         /// <summary>
         /// Synchronizes the queues and active calls with the system.
         /// </summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event arguments.</param>
-       
+
         private void HandleQueuesAndCallsSync(object sender, EventArgs e)
         {
             Task.Run(async () => await GetAllCallsAndQueues());
         }
-      
+
         /// <summary>
         /// Updates the operator directory number when a change occurs.
         /// </summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="dirNo">The new operator directory number.</param>
-       
+
         private void HandleOperatorDirectoryNumberChange(object sender, string dirNo)
         {
             _configuration.OperatorDirNo = dirNo;
@@ -385,37 +387,56 @@ namespace ConnectPro.Handlers
         /// <param name="to_dir">The directory number of the receiving device.</param>
         /// <param name="action">The action to perform (e.g., "answer", "cancel").</param>
         /// <param name="hangUpCurrent">Indicates whether the current active call should be hung up before making a new call.</param>
-       
-        public async Task PostCall(string from_dir, string to_dir, string action, bool hangUpCurrent = true)
+
+        public async Task<CallResponse> PostCall(
+    string from_dir,
+    string to_dir,
+    string action,
+    bool hangUpCurrent = true)
         {
-            await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 lock (_postCallLock)
                 {
                     try
                     {
-                        if (_collections.ActiveCalls.Count > 0)
+                        CallResponse deleteResponse = null;
+
+                        if (_collections.ActiveCalls.Count > 0 && hangUpCurrent)
                         {
-                            if (hangUpCurrent)
-                            {
-                                Task.Run(async () => await DeleteCall(_collections.ActiveCalls[0].dirno));
-                            }
+                            // WAIT and capture result
+                            deleteResponse = DeleteCall(_collections.ActiveCalls[0].dirno)
+                                .GetAwaiter()
+                                .GetResult();
                         }
-                        _wamp.PostCalls(from_dir, to_dir, action);
+
+                        var wampResponse = _wamp.PostCalls(from_dir, to_dir, action);
+                        var callResponse = CallResponse.FromWampResponse(wampResponse);
+
+                        // Merge delete result into final response
+                        if (deleteResponse != null && !deleteResponse.Success)
+                        {
+                            callResponse.Success = false;
+                            callResponse.CompletionText =
+                                $"PostCall succeeded, but DeleteCall failed: {deleteResponse.CompletionText}";
+                        }
+
+                        return callResponse;
                     }
-                    catch (Exception exe)
+                    catch (Exception ex)
                     {
-                        _events.OnExceptionThrown?.Invoke(this, exe);
+                        _events.OnExceptionThrown?.Invoke(this, ex);
+                        return CallResponse.FromException(ex);
                     }
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Adds a device to the active calls list and ensure no duplicate entries are added to the list
         /// </summary>
         /// <param name="device">The device to add.</param>
-       
+
         public async Task AddToActiveCalls(Device device)
         {
             await Task.Run(() =>
@@ -441,7 +462,7 @@ namespace ConnectPro.Handlers
         /// Removes a device from the active calls list.
         /// </summary>
         /// <param name="device">The device to remove.</param>
-       
+
         public async void RemoveFromActiveCall(Device device)
         {
             await Task.Run(() =>
@@ -473,31 +494,60 @@ namespace ConnectPro.Handlers
         /// Answers a queued call.
         /// </summary>
         /// <param name="queuedDevice">The queued call to answer.</param>
-       
-        public async Task AnswerQueuedCall(CallLegElement queuedDevice)
+
+        public async Task<CallResponse> AnswerQueuedCall(CallLegElement queuedDevice)
         {
-            await Task.Run(() =>
+            string fromDirno;
+
+            lock (_answerQueuedCallLock)
+            {
+                if (queuedDevice == null)
+                {
+                    return new CallResponse
+                    {
+                        Success = false,
+                        WampResponse = ResponseType.WampNoResponce,
+                        CompletionText = "Queued device is null."
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(queuedDevice.from_dirno))
+                {
+                    return new CallResponse
+                    {
+                        Success = false,
+                        WampResponse = ResponseType.WampNoResponce,
+                        CompletionText = "Queued device from_dirno is empty."
+                    };
+                }
+
+                fromDirno = queuedDevice.from_dirno;
+            }
+
+            var response = await PostCall(
+                    fromDirno,
+                    _configuration.OperatorDirNo,
+                    "answer")
+                .ConfigureAwait(false);
+
+            if (response.Success)
             {
                 lock (_answerQueuedCallLock)
                 {
-                    if (queuedDevice != null)
-                    {
-                        if (queuedDevice.from_dirno != null)
-                        {
-                            Task.Run(async () => await PostCall(queuedDevice.from_dirno, _configuration.OperatorDirNo, "answer"));
-                            this.ActiveDevice = _collections.RegisteredDevices.FirstOrDefault(x => x.dirno == queuedDevice.from_dirno);
-                        }
-                    }
+                    ActiveDevice = _collections.RegisteredDevices
+                        .FirstOrDefault(x => x.dirno == fromDirno);
                 }
-            });
+            }
+
+            return response;
         }
 
-       
+
         /// <summary>
         /// Adds a queued call to the call queue list and ensure no duplicate entries are added to the list
         /// </summary>
         /// <param name="callLeg">The queued call element to add.</param>
-        
+
         public async Task AddToQueuedCalls(CallLegElement callLeg)
         {
             await Task.Run(() =>
@@ -524,12 +574,12 @@ namespace ConnectPro.Handlers
                 }
             });
         }
-       
+
         /// <summary>
         /// Removes a queued call from the call queue list.
         /// </summary>
         /// <param name="callLeg">The queued call element to remove.</param>
-        
+
         public async Task RemoveFromQueuedCalls(wamp_call_leg_element callLeg)
         {
             await Task.Run(() =>
@@ -558,12 +608,12 @@ namespace ConnectPro.Handlers
                 }
             });
         }
-       
+
         /// <summary>
         /// Removes a queued call from the call queue list based on a device.
         /// </summary>
         /// <param name="callDevice">The device associated with the queued call.</param>
-        
+
         public async Task RemoveFromQueuedCalls(Device callDevice)
         {
             await Task.Run(() =>
@@ -642,7 +692,7 @@ namespace ConnectPro.Handlers
                                 }
                                 _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
 
-                                if(_collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault() != null)
+                                if (_collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault() != null)
                                 {
                                     _collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault().OnBussyStateChange?.Invoke(this, IsBusy(call.CallState));
                                 }
@@ -686,7 +736,7 @@ namespace ConnectPro.Handlers
         /// <param name="callid">Optional call ID filter.</param>
         /// <param name="state">Optional call state filter.</param>
         /// <returns>A list of active calls.</returns>
-        
+
         public async Task<List<CallElement>> GetAllCalls(string dirno = null, string callid = null, string state = null)
         {
             List<CallElement> calls = new List<CallElement>();
@@ -711,7 +761,7 @@ namespace ConnectPro.Handlers
             });
             return calls;
         }
-       
+
         /// <summary>
         /// Retrieves a list of all queued calls.
         /// </summary>
@@ -719,7 +769,7 @@ namespace ConnectPro.Handlers
         /// <param name="fromDirno">Optional originating directory number filter.</param>
         /// <param name="callid">Optional call ID filter.</param>
         /// <returns>A list of queued calls.</returns>
-        
+
         public List<CallLegElement> GetAllQueues(string dirno = "", string fromDirno = "", string callid = "")
         {
             List<CallLegElement> queues = new List<CallLegElement>();
@@ -850,22 +900,62 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Deletes all active and queued calls.
         /// </summary>
-
-        public async Task DeleteAllCall()
+        public async Task<CallResponse> DeleteAllCall()
         {
-
-            List<CallElement> allCalls = await GetAllCalls();
-            lock (_deleteAllCallLock)
+            try
             {
-                foreach (var call in allCalls)
+                List<CallElement> allCalls = await GetAllCalls().ConfigureAwait(false);
+
+                if (allCalls == null || allCalls.Count == 0)
                 {
-                    _wamp.DeleteCallId(call.CallId.ToString());
+                    return new CallResponse
+                    {
+                        Success = true,
+                        CompletionText = "No calls to delete."
+                    };
                 }
-                _collections.ActiveCalls.Clear();
-                _collections.CallQueue.Clear();
-                _events.OnActiveCallListValueChange?.Invoke(this, EventArgs.Empty);
-                _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
-                _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+
+                bool allSucceeded = true;
+                var messages = new List<string>();
+
+                lock (_deleteAllCallLock)
+                {
+                    foreach (var call in allCalls)
+                    {
+                        var response = _wamp.DeleteCallId(call.CallId.ToString());
+
+                        var mapped = CallResponse.FromWampResponse(response);
+
+                        if (!mapped.Success)
+                        {
+                            allSucceeded = false;
+                            messages.Add($"Call {call.CallId}: {mapped.CompletionText}");
+                        }
+                    }
+
+                    _collections.ActiveCalls.Clear();
+                    _collections.CallQueue.Clear();
+
+                    _events.OnActiveCallListValueChange?.Invoke(this, EventArgs.Empty);
+                    _events.OnCallQueueListValueChange?.Invoke(this, EventArgs.Empty);
+                    _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+                }
+
+                return new CallResponse
+                {
+                    Success = allSucceeded,
+                    WampResponse = allSucceeded
+                        ? ResponseType.WampRequestSucceeded
+                        : ResponseType.WampRequestFailed,
+                    CompletionText = allSucceeded
+                        ? "All calls deleted successfully."
+                        : $"Some deletions failed: {string.Join(" | ", messages)}"
+                };
+            }
+            catch (Exception ex)
+            {
+                _events.OnExceptionThrown?.Invoke(this, ex);
+                return CallResponse.FromException(ex);
             }
         }
 
@@ -873,82 +963,118 @@ namespace ConnectPro.Handlers
         /// Deletes a specific call based on the directory number.
         /// </summary>
         /// <param name="dirno">The directory number of the call to delete.</param>
-        
-        public async Task DeleteCall(string dirno)
+
+        public async Task<CallResponse> DeleteCall(string dirno)
         {
-            await Task.Run(() =>
+            return await Task.Run(() =>
             {
                 lock (_deleteCallLock)
                 {
                     try
                     {
-                        List<wamp_call_element> activeCalls = _wamp.requestCallList(dirno, "", "");
-                        List<wamp_call_leg_element> queuedCalls = _wamp.requestCallLegs("", "", "", "", "", "", "");
+                        List<wamp_call_element> activeCalls =
+                            _wamp.requestCallList(dirno, "", "");
+
+                        List<wamp_call_leg_element> queuedCalls =
+                            _wamp.requestCallLegs("", "", "", "", "", "", "");
 
                         if (activeCalls != null)
                         {
                             wamp_call_element activeCall = FindMatchingCall(activeCalls, dirno);
+
                             if (activeCall != null)
                             {
-                                Task.Run(() => _wamp.DeleteCallId(activeCall.call_id));
-                                Task.Run(() => _wamp.DeleteCalls(dirno)); //falback
+                                wamp_response response = _wamp.DeleteCallId(activeCall.call_id);
+
+                                // fallback only if deleting by call_id failed or produced no response
+                                if (response == null ||
+                                    response.WampResponse != ResponseType.WampRequestSucceeded)
+                                {
+                                    response = _wamp.DeleteCalls(dirno);
+                                }
+
                                 _events.OnCallLogEntryRequested?.Invoke(this, activeCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+
+                                return CallResponse.FromWampResponse(response);
                             }
                         }
 
                         if (queuedCalls != null)
                         {
-                            wamp_call_leg_element queuedCall = FindMatchingQueuedCall(queuedCalls, dirno);
+                            wamp_call_leg_element queuedCall =
+                                FindMatchingQueuedCall(queuedCalls, dirno);
+
                             if (queuedCall != null)
                             {
-                                Task.Run(() => _wamp.DeleteCallId(queuedCall.call_id));
-                                Task.Run(() => _wamp.DeleteCalls(dirno)); //falback
+                                wamp_response response = _wamp.DeleteCallId(queuedCall.call_id);
+
+                                // fallback only if deleting by call_id failed or produced no response
+                                if (response == null ||
+                                    response.WampResponse != ResponseType.WampRequestSucceeded)
+                                {
+                                    response = _wamp.DeleteCalls(dirno);
+                                }
+
                                 _events.OnCallLogEntryRequested?.Invoke(this, queuedCall);
                                 _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+
+                                return CallResponse.FromWampResponse(response);
                             }
                         }
+
+                        return new CallResponse
+                        {
+                            Success = false,
+                            WampResponse = ResponseType.WampNoResponce,
+                            CompletionText = $"No active or queued call found for dirno '{dirno}'."
+                        };
                     }
                     catch (Exception exe)
                     {
                         _events.OnExceptionThrown?.Invoke(this, exe);
                         _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+
+                        return CallResponse.FromException(exe);
                     }
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Deletes a specific call based on the call ID.
         /// </summary>
         /// <param name="callId">The unique identifier of the call to delete.</param>
-        
-        public async Task DeleteCall(int callId)
+
+        public async Task<CallResponse> DeleteCall(int callId)
         {
-            await Task.Run(() =>
+            try
             {
+                List<CallElement> calls =
+                    await GetAllCalls(null, callId.ToString())
+                        .ConfigureAwait(false);
+
                 lock (_deleteCallLock)
                 {
-                    try
+                    if (calls != null && calls.Count > 0)
                     {
-                        List<CallElement> calls = GetAllCalls(null, callId.ToString()).Result;
-                        if (calls != null)
-                        {
-                            if (calls.Count > 0)
-                            {
-                                _events.OnCallLogEntryRequested?.Invoke(this, calls.First());
-                            }
-                        }
-                        _wamp.DeleteCallId(callId.ToString());
-                        _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+                        _events.OnCallLogEntryRequested?.Invoke(this, calls.First());
                     }
-                    catch (Exception exe)
-                    {
-                        _events.OnExceptionThrown?.Invoke(this, exe);
-                        _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
-                    }
+
+                    wamp_response response = _wamp.DeleteCallId(callId.ToString());
+
+                    _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+
+                    return CallResponse.FromWampResponse(response);
                 }
-            });
+            }
+            catch (Exception exe)
+            {
+                _events.OnExceptionThrown?.Invoke(this, exe);
+                _events.OnActiveVideoFeedChange?.Invoke(this, EventArgs.Empty);
+
+                return CallResponse.FromException(exe);
+            }
         }
 
         #endregion
@@ -961,7 +1087,7 @@ namespace ConnectPro.Handlers
         /// <param name="callList">The list of calls to search through.</param>
         /// <param name="dirno">The directory number to match.</param>
         /// <returns>The matching call element, if found; otherwise, null.</returns>
-        
+
         private wamp_call_element FindMatchingCall(List<wamp_call_element> callList, string dirno)
         {
             for (int i = 0; i < callList.Count; i++)
@@ -980,7 +1106,7 @@ namespace ConnectPro.Handlers
         /// <param name="queuedCalls">The list of queued calls to search through.</param>
         /// <param name="dirno">The directory number to match.</param>
         /// <returns>The matching queued call element, if found; otherwise, null.</returns>
-        
+
         private wamp_call_leg_element FindMatchingQueuedCall(List<wamp_call_leg_element> queuedCalls, string dirno)
         {
             for (int i = 0; i < queuedCalls.Count; i++)

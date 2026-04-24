@@ -56,6 +56,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\Group.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Operator.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\PrerecordedMessage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\Responses\CallResponse.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\AssemblyChecker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\Cryptography.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\ErrorLogger.cs" />
