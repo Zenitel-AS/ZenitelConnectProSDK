@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using Wamp.Client;
 
 namespace ConnectPro.Models
@@ -163,6 +164,48 @@ namespace ConnectPro.Models
         /// </summary>
         [NotMapped]
         public DeviceGpio Gpio { get; internal set; }
+
+        /// <summary>
+        /// Gets a value indicating whether runtime GPIO capability is attached to this device.
+        /// </summary>
+        [NotMapped]
+        public bool HasGpio => Gpio != null;
+
+        /// <summary>
+        /// Gets the current number of known GPIO input points.
+        /// </summary>
+        [NotMapped]
+        public int GpiCount => Gpio?.Inputs.Count ?? 0;
+
+        /// <summary>
+        /// Gets the current number of active GPIO input points.
+        /// </summary>
+        [NotMapped]
+        public int ActiveGpiCount => Gpio?.Inputs.Count(x => x.State == GpioState.Active) ?? 0;
+
+        /// <summary>
+        /// Gets the current number of known GPIO output points.
+        /// </summary>
+        [NotMapped]
+        public int GpoCount => Gpio?.Outputs.Count ?? 0;
+
+        /// <summary>
+        /// Gets the current number of active GPIO output points.
+        /// </summary>
+        [NotMapped]
+        public int ActiveGpoCount => Gpio?.Outputs.Count(x => x.State == GpioState.Active) ?? 0;
+
+        /// <summary>
+        /// Gets a value indicating whether any GPIO input is currently active.
+        /// </summary>
+        [NotMapped]
+        public bool HasActiveGpi => ActiveGpiCount > 0;
+
+        /// <summary>
+        /// Gets a value indicating whether any GPIO output is currently active.
+        /// </summary>
+        [NotMapped]
+        public bool HasActiveGpo => ActiveGpoCount > 0;
 
         #endregion
 

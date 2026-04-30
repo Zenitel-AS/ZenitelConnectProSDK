@@ -245,28 +245,22 @@ namespace ConnectPro.Handlers
                     throw new Exception(
                         $"HandleDeviceGPIOStatusEvent exception: No device found for dirno {wampGpioEvent.Dirno}");
 
-                var gpio = device.Gpio.Inputs
-                    .Concat(device.Gpio.Outputs)
-                    .FirstOrDefault(x => x.Id == wampGpioEvent.Element.id);
-
-                if (gpio == null)
+                if (device.Gpio == null)
                     throw new Exception(
-                        $"HandleDeviceGPIOStatusEvent exception: No GPIO found for dirno {wampGpioEvent.Dirno}, gpio {wampGpioEvent.Element.id}");
+                        $"HandleDeviceGPIOStatusEvent exception: No GPIO runtime attached for dirno {wampGpioEvent.Dirno}");
 
-                switch ((wampGpioEvent.Element.state ?? string.Empty).Trim().ToUpperInvariant())
-                {
-                    case "HIGH":
-                        gpio.State = Enums.GpioState.Active;
-                        break;
+                var direction = ResolveDirection(sender, wampGpioEvent.Element);
+                var state = ParseGpioState(wampGpioEvent.Element);
+                var rawState = !string.IsNullOrWhiteSpace(wampGpioEvent.Element.state)
+                    ? wampGpioEvent.Element.state
+                    : wampGpioEvent.Element.operation;
 
-                    case "LOW":
-                        gpio.State = Enums.GpioState.Inactive;
-                        break;
-
-                    default:
-                        gpio.State = Enums.GpioState.Unknown;
-                        break;
-                }
+                device.Gpio.Upsert(new GpioPoint(
+                    wampGpioEvent.Element.id,
+                    direction,
+                    state,
+                    DateTimeOffset.UtcNow,
+                    rawState ?? string.Empty));
 
                 _events.OnGpioEvent?.Invoke(this, wampGpioEvent);
             }
@@ -274,6 +268,45 @@ namespace ConnectPro.Handlers
             {
                 _events.OnExceptionThrown?.Invoke(this, ex);
             }
+        }
+
+        private static Enums.GpioState ParseGpioState(wamp_device_gpio_element element)
+        {
+            if (element == null)
+                return Enums.GpioState.Unknown;
+
+            switch ((element.state ?? string.Empty).Trim().ToUpperInvariant())
+            {
+                case "HIGH":
+                case "1":
+                case "ACTIVE":
+                    return Enums.GpioState.Active;
+
+                case "LOW":
+                case "0":
+                case "INACTIVE":
+                    return Enums.GpioState.Inactive;
+            }
+
+            switch ((element.operation ?? string.Empty).Trim().ToUpperInvariant())
+            {
+                case "SET":
+                    return Enums.GpioState.Active;
+
+                case "CLEAR":
+                    return Enums.GpioState.Inactive;
+
+                default:
+                    return Enums.GpioState.Unknown;
+            }
+        }
+
+        private static Enums.GpioDirection ResolveDirection(object sender, wamp_device_gpio_element element)
+        {
+            if (!string.IsNullOrWhiteSpace(element?.operation))
+                return Enums.GpioDirection.Gpo;
+
+            return Enums.GpioDirection.Gpi;
         }
 
         #endregion

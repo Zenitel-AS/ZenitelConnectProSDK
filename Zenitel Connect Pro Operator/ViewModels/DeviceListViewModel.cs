@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ConnectPro.Enums;
 using ConnectPro.Models;
 using ConnectPro.Models.AccessControl;
-using ConnectPro.Models.GPIO;
 using Wamp.Client;
 using ZenitelConnectProOperator.Core.Abstractions;
 
@@ -39,8 +37,8 @@ public partial class DeviceListViewModel : ObservableObject, IDisposable
 
         _connectPro.Core.Events.OnDeviceListChange += OnDevicesChanged;
         _connectPro.Core.Events.OnOperatorDirNoChange += OnOperatorChanged;
-        _connectPro.Core.Events.OnGpioEvent += HandleGpioEvent;
         _connectPro.Core.Events.OnDoorOpen += HandleDoorOpenEvent;
+        _connectPro.Core.Events.OnGpioEvent += HandleGPIOEvent;
 
         QueueRefresh();
     }
@@ -53,6 +51,11 @@ public partial class DeviceListViewModel : ObservableObject, IDisposable
         var fromDirno = eventData.FromDirno;
         var isPostSuccess = eventData.IsSuccess; // This one is used only when POST-ing the event to ZCP
         var eventInformation = eventData.EventInformationMessage;
+    }
+
+    private void HandleGPIOEvent(object sender, WampGpioEventArgs e)
+    {
+        var dirno = e.Dirno;
     }
 
     private void OnDevicesChanged(object? sender, EventArgs e) => QueueRefresh();
@@ -106,88 +109,6 @@ public partial class DeviceListViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void HandleGpioEvent(object? sender, WampGpioEventArgs wgea)
-    {
-        _connectPro.Core.Events.OnChildLogEntry.Invoke(this, 
-            $"Received GPIO event for device {wgea.Dirno}, element {wgea.Element.id}, state {wgea.Element.state}, operation {wgea.Element.operation}");
-
-        // Determine the direction and state from the event
-        Device? device = _connectPro?.Core.Collection.RegisteredDevices.FirstOrDefault(d => d.dirno == wgea.Dirno);
-        if (device?.Gpio is null)
-            return;
-
-        GpioDirection direction;
-        if (device.Gpio.Inputs.Any(i => i.Id == wgea.Element.id))
-            direction = GpioDirection.Gpi;
-        else if (device.Gpio.Outputs.Any(o => o.Id == wgea.Element.id))
-            direction = GpioDirection.Gpo;
-        else
-        {
-            _connectPro?.Core.Events.OnChildLogEntry.Invoke(this,
-                $"GPIO Point {wgea.Element.id} not found for device {device.dirno}");
-            return;
-        }
-
-        var updatedPoint = new GpioPoint(
-            wgea.Element.id,
-            direction,
-            ParseGpioState(wgea.Element),
-            DateTimeOffset.UtcNow,
-            wgea.Element.state ?? wgea.Element.operation ?? string.Empty);
-
-        // Find the matching DeviceViewModel and push the update through the UI layer
-        Dispatcher.UIThread.Post(() =>
-        {
-            var vm = Devices.FirstOrDefault(d => d.Device.dirno == wgea.Dirno);
-            vm?.UpdateGpioFromEvent(updatedPoint);
-        });
-    }
-    
-    private static GpioState ParseGpioState(WampClient.wamp_device_gpio_element element)
-    {
-        // Primary: use "state" field when present ("low"/"high")
-        if (!string.IsNullOrEmpty(element.state))
-        {
-            if (element.state.Equals("high", StringComparison.OrdinalIgnoreCase))
-                return GpioState.Active;
-
-            if (element.state.Equals("low", StringComparison.OrdinalIgnoreCase))
-                return GpioState.Inactive;
-
-            if (element.state == "1") return GpioState.Active;
-            if (element.state == "0") return GpioState.Inactive;
-        }
-
-        // Fallback: GPO events use "operation" ("set"/"clear") instead of "state"
-        if (!string.IsNullOrEmpty(element.operation))
-        {
-            if (element.operation.Equals("set", StringComparison.OrdinalIgnoreCase))
-                return GpioState.Active;
-
-            if (element.operation.Equals("clear", StringComparison.OrdinalIgnoreCase))
-                return GpioState.Inactive;
-        }
-
-        return GpioState.Unknown;
-    }
-    private static async Task SafeRefreshGpio(Device device)
-    {
-        try
-        {
-            // Gpio is runtime-attached and may be null depending on how the Device was created.
-            // Device.Gpio is NOT mapped/persisted and is attached by the SDK at runtime. :contentReference[oaicite:1]{index=1}
-            if (device.Gpio is null)
-                return;
-
-            await device.Gpio.RefreshAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Swallow: UI list rendering must not fail due to transient GPIO/WAMP issues.
-            // If you want diagnostics, inject a logger later.
-        }
-    }
-
     [RelayCommand]
     private async Task ToggleCall(Device device)
     {
@@ -219,7 +140,7 @@ public partial class DeviceListViewModel : ObservableObject, IDisposable
         {
             _connectPro.Core.Events.OnDeviceListChange -= OnDevicesChanged;
             _connectPro.Core.Events.OnOperatorDirNoChange -= OnOperatorChanged;
-            _connectPro.Core.Events.OnGpioEvent -= HandleGpioEvent;
+            _connectPro.Core.Events.OnDoorOpen -= HandleDoorOpenEvent;
         }
     }
 }
