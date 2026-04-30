@@ -2,122 +2,156 @@
 using System.Collections.Generic;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
-using WampSharp.V2.PubSub;
 using WampSharp.V2.Core.Contracts;
-using static Wamp.Client.WampClient;
-
+using WampSharp.V2.PubSub;
 
 namespace Wamp.Client
 {
     public partial class WampClient
     {
-        /***********************************************************************************************************************/
-        /********************                       Trace Audio Detector Alive                               *******************/
-        /***********************************************************************************************************************/
+        private readonly object _traceAudioDetectorAliveGate = new object();
 
-        TracerAudioDetectorAlive tracerAudioDetectorAlive = null;
- 
-        IAsyncDisposable tracerAudioDetectorAlivesDisposable = null;
+        private TracerAudioDetectorAlive tracerAudioDetectorAlive;
+        private IAsyncDisposable tracerAudioDetectorAlivesDisposable;
 
-        ///<summary>Event Handler for Audio Event Detector Alive Event</summary>
         public event EventHandler<wamp_audio_detector_alive> OnAudioDetectorAlive;
 
-        ///<summary> </summary>
-        /***********************************************************************************************************************/
         public async void TraceAudioDetectorAlive()
-        /***********************************************************************************************************************/       
         {
-            IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampAudioDetectorAlive);
+            try
+            {
+                lock (_traceAudioDetectorAliveGate)
+                {
+                    if (tracerAudioDetectorAlivesDisposable != null)
+                        return;
+                }
 
-            tracerAudioDetectorAlive = new TracerAudioDetectorAlive();
-            tracerAudioDetectorAlive.OnAudioDetectorAlive += TracerAudioDetectorAlive_OnAudioDetectionEvent;
-            tracerAudioDetectorAlive.OnDebugString += TracerAudioDetectorAlive_OnDebugString;
+                if (_wampRealmProxy == null)
+                {
+                    OnChildLogString?.Invoke(this, "TraceAudioDetectorAlive skipped. WAMP realm proxy is not available.");
+                    return;
+                }
 
-            tracerAudioDetectorAlivesDisposable = await topicProxy.Subscribe(tracerAudioDetectorAlive, new SubscribeOptions()).ConfigureAwait(false);
+                IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampAudioDetectorAlive);
+
+                var tracer = new TracerAudioDetectorAlive();
+                tracer.OnAudioDetectorAlive += TracerAudioDetectorAlive_OnAudioDetectionEvent;
+                tracer.OnDebugString += TracerAudioDetectorAlive_OnDebugString;
+
+                IAsyncDisposable subscription = await topicProxy
+                    .Subscribe(tracer, new SubscribeOptions())
+                    .ConfigureAwait(false);
+
+                lock (_traceAudioDetectorAliveGate)
+                {
+                    if (tracerAudioDetectorAlivesDisposable != null)
+                    {
+                        tracer.OnAudioDetectorAlive -= TracerAudioDetectorAlive_OnAudioDetectionEvent;
+                        tracer.OnDebugString -= TracerAudioDetectorAlive_OnDebugString;
+                        subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        return;
+                    }
+
+                    tracerAudioDetectorAlive = tracer;
+                    tracerAudioDetectorAlivesDisposable = subscription;
+                }
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception in TraceAudioDetectorAlive: " + ex);
+            }
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerAudioDetectorAlive_OnDebugString(object sender, string e)
-        /***********************************************************************************************************************/
         {
             OnChildLogString?.Invoke(this, "Audio Detector Alive Subscription: " + e);
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerAudioDetectorAlive_OnAudioDetectionEvent(object sender, wamp_audio_detector_alive audioEvent)
-        /***********************************************************************************************************************/       
         {
             OnAudioDetectorAlive?.Invoke(this, audioEvent);
         }
 
-
-        ///<summary>Handle Audio Detector Alive Event Dispose</summary>
-        /***********************************************************************************************************************/
         public void TraceAudioDetectorAliveDispose()
-        /***********************************************************************************************************************/
         {
-            if (tracerAudioDetectorAlivesDisposable != null)
+            TracerAudioDetectorAlive tracer = null;
+            IAsyncDisposable subscription = null;
+
+            lock (_traceAudioDetectorAliveGate)
             {
-                tracerAudioDetectorAlivesDisposable.DisposeAsync();
-                tracerAudioDetectorAlivesDisposable = null;
+                tracer = tracerAudioDetectorAlive;
+                subscription = tracerAudioDetectorAlivesDisposable;
+
                 tracerAudioDetectorAlive = null;
+                tracerAudioDetectorAlivesDisposable = null;
+            }
+
+            if (tracer != null)
+            {
+                tracer.OnAudioDetectorAlive -= TracerAudioDetectorAlive_OnAudioDetectionEvent;
+                tracer.OnDebugString -= TracerAudioDetectorAlive_OnDebugString;
+            }
+
+            if (subscription == null)
+                return;
+
+            try
+            {
+                subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception disposing TraceAudioDetectorAlive subscription: " + ex);
             }
         }
 
-        ///<summary>Return the Audio Detector Alive Event Enabled Status</summary>
-        /***********************************************************************************************************************/
         public bool TraceAudioDetectorAliveIsEnabled()
-        /***********************************************************************************************************************/
         {
-            if (tracerAudioDetectorAlive == null)
+            lock (_traceAudioDetectorAliveGate)
             {
-                return false;
-            }
-            else
-            {
-                return true;
+                return tracerAudioDetectorAlivesDisposable != null;
             }
         }
 
-
-        /***********************************************************************************************************************/
         internal class TracerAudioDetectorAlive : IWampRawTopicClientSubscriber
-        /***********************************************************************************************************************/
         {
-
             public event EventHandler<wamp_audio_detector_alive> OnAudioDetectorAlive;
             public event EventHandler<string> OnDebugString;
 
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details)
             {
-                string txt = "Got event with publication id: " + publicationId.ToString();
-                OnDebugString?.Invoke(this, txt);
+                OnDebugString?.Invoke(this, "Got event with publication id: " + publicationId);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments)
             {
-                string json_str = arguments[0].ToString();
-                OnDebugString?.Invoke(this, json_str);
+                if (arguments == null || arguments.Length == 0 || arguments[0] == null)
+                    return;
 
-                wamp_audio_detector_alive audioEvent = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_audio_detector_alive>(arguments[0].ToString());
-                OnAudioDetectorAlive?.Invoke(this, audioEvent);
+                string json = arguments[0].ToString();
+                OnDebugString?.Invoke(this, json);
+
+                var audioEvent = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_audio_detector_alive>(json);
+
+                if (audioEvent != null)
+                    OnAudioDetectorAlive?.Invoke(this, audioEvent);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments,
-                                        IDictionary<string, TMessage> argumentsKeywords)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments,
+                IDictionary<string, TMessage> argumentsKeywords)
             {
-                string txt = "Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments, IDictionary<string, TMessage> argumentsKeywords) IS NOT SUPPORTED";
-                OnDebugString?.Invoke(this, txt);
+                OnDebugString?.Invoke(this, "Event with argumentsKeywords is not supported.");
             }
         }
     }

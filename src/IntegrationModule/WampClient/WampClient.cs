@@ -204,6 +204,9 @@ namespace Wamp.Client
 
 
         private Timer _reconnectTimer;
+        private readonly object _connectionGate = new object();
+        private bool _isStopping;
+        private bool _certificateCallbackRegistered;
 
 
         /// <summary>Zenitel Connect Server IP Address.</summary>
@@ -288,6 +291,12 @@ namespace Wamp.Client
         public void Start()
         /***********************************************************************************************************************/
         {
+            lock (_connectionGate)
+            {
+                if (_isStopping)
+                    return;
+            }
+
             OnChildLogString?.Invoke(this, "WampConnection.Start().");
             StartReconnect();
         }
@@ -299,18 +308,15 @@ namespace Wamp.Client
         {
             OnChildLogString?.Invoke(this, "RenewAccessTokenTimer timeout encountered.");
 
-            if (RenewAccessTokenTimer != null)
+            StopRenewAccessTokenTimer();
+
+            lock (_connectionGate)
             {
-                //Delete timer
-                RenewAccessTokenTimer.Dispose();
-                RenewAccessTokenTimer = null;
-                RenewAccessTokenRequested = false;
+                if (_isStopping || !IsConnected)
+                    return;
             }
- 
-            if (IsConnected)
-            {
-                RequestNewAcessToken();
-            }
+
+            RequestNewAcessToken();
         }
 
 
@@ -319,15 +325,21 @@ namespace Wamp.Client
         public void Stop()
         /***********************************************************************************************************************/
         {
-            StopReconnect();
-            ResetChannel();
-
-            if (RenewAccessTokenTimer != null)
+            lock (_connectionGate)
             {
-                //Delete timer
-                RenewAccessTokenTimer.Dispose();
-                RenewAccessTokenTimer = null;
+                _isStopping = true;
+            }
+
+            StopReconnect();
+            StopRenewAccessTokenTimer();
+            ResetChannel();
+            RemoveCertificateValidationCallback();
+
+            lock (_connectionGate)
+            {
+                IsConnected = false;
                 RenewAccessTokenRequested = false;
+                _isStopping = false;
             }
         }
 
@@ -348,6 +360,41 @@ namespace Wamp.Client
             return true;
         }
 
+        /***********************************************************************************************************************/
+        private void StopRenewAccessTokenTimer()
+        /***********************************************************************************************************************/
+        {
+            if (RenewAccessTokenTimer != null)
+            {
+                RenewAccessTokenTimer.Dispose();
+                RenewAccessTokenTimer = null;
+            }
+
+            RenewAccessTokenRequested = false;
+        }
+
+        /***********************************************************************************************************************/
+        private void EnsureCertificateValidationCallback()
+        /***********************************************************************************************************************/
+        {
+            if (_certificateCallbackRegistered)
+                return;
+
+            ServicePointManager.ServerCertificateValidationCallback += ValidateRemoteCertificate;
+            _certificateCallbackRegistered = true;
+        }
+
+        /***********************************************************************************************************************/
+        private void RemoveCertificateValidationCallback()
+        /***********************************************************************************************************************/
+        {
+            if (!_certificateCallbackRegistered)
+                return;
+
+            ServicePointManager.ServerCertificateValidationCallback -= ValidateRemoteCertificate;
+            _certificateCallbackRegistered = false;
+        }
+
 
         /***********************************************************************************************************************/
         private void StartReconnect()
@@ -359,6 +406,12 @@ namespace Wamp.Client
                 {
                     try
                     {
+                        lock (_connectionGate)
+                        {
+                            if (_isStopping)
+                                return;
+                        }
+
                         bool useEncryption = WampPort.Equals(WampEncryptedPort);
 
                         // Authentication is HTTP / HTTPS 
@@ -378,7 +431,7 @@ namespace Wamp.Client
 
                         rq.Headers.Add("Authorization", "Basic " + encoded);
 
-                        ServicePointManager.ServerCertificateValidationCallback += new RemoteCertificateValidationCallback(ValidateRemoteCertificate);
+                        EnsureCertificateValidationCallback();
                         #if NET48
                         // .NET Framework 4.8: Use TLS 1.3, 1.2, 1.1, and 1.0
                         ServicePointManager.SecurityProtocol =
@@ -394,31 +447,36 @@ namespace Wamp.Client
                             SecurityProtocolType.Tls;
                         #endif
 
-                        HttpWebResponse res = (HttpWebResponse)rq.GetResponse();
-                        if (res.StatusCode == HttpStatusCode.OK)
+                        using (HttpWebResponse res = (HttpWebResponse)rq.GetResponse())
                         {
-                            var resstring = new StreamReader(res.GetResponseStream()).ReadToEnd();
-
-                            json_login_result json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<json_login_result>(resstring);
-
-                            if (json_result == null)
+                            if (res.StatusCode == HttpStatusCode.OK)
                             {
-                                SetConnectState(false, "null result");
-                            }
+                                using (var reader = new StreamReader(res.GetResponseStream()))
+                                {
+                                    var resstring = reader.ReadToEnd();
 
-                            else if (string.IsNullOrEmpty(json_result.access_token))
-                            {
-                                SetConnectState(false, "empty token");
+                                    json_login_result json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<json_login_result>(resstring);
+
+                                    if (json_result == null)
+                                    {
+                                        SetConnectState(false, "null result");
+                                    }
+
+                                    else if (string.IsNullOrEmpty(json_result.access_token))
+                                    {
+                                        SetConnectState(false, "empty token");
+                                    }
+                                    else
+                                    {
+                                        OnChildLogString?.Invoke(this, "Access Token: " + json_result.access_token);
+                                        SetConnectState(true, null, json_result.access_token);
+                                    }
+                                }
                             }
                             else
                             {
-                                OnChildLogString?.Invoke(this, "Access Token: " + json_result.access_token);
-                                SetConnectState(true, null, json_result.access_token);
+                                SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
                             }
-                        }
-                        else
-                        {
-                            SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
                         }
 
                     }
@@ -443,6 +501,12 @@ namespace Wamp.Client
         {
             try
             {
+                lock (_connectionGate)
+                {
+                    if (_isStopping)
+                        return;
+                }
+
                 bool useEncryption = WampPort.Equals(WampEncryptedPort);
 
                 // Authentication is HTTP / HTTPS 
@@ -462,7 +526,7 @@ namespace Wamp.Client
 
                 rq.Headers.Add("Authorization", "Basic " + encoded);
 
-                ServicePointManager.ServerCertificateValidationCallback += new RemoteCertificateValidationCallback(ValidateRemoteCertificate);
+                EnsureCertificateValidationCallback();
                 #if NET48
                 // .NET Framework 4.8: Use TLS 1.3, 1.2, 1.1, and 1.0
                 ServicePointManager.SecurityProtocol =
@@ -477,34 +541,39 @@ namespace Wamp.Client
                     SecurityProtocolType.Tls11 |
                     SecurityProtocolType.Tls;
                 #endif
-                HttpWebResponse res = (HttpWebResponse)rq.GetResponse();
-                if (res.StatusCode == HttpStatusCode.OK)
+                using (HttpWebResponse res = (HttpWebResponse)rq.GetResponse())
                 {
-                    var resstring = new StreamReader(res.GetResponseStream()).ReadToEnd();
-
-                    json_login_result json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<json_login_result>(resstring);
-
-                    if (json_result != null)
+                    if (res.StatusCode == HttpStatusCode.OK)
                     {
-                        if (! string.IsNullOrEmpty(json_result.access_token))
+                        using (var reader = new StreamReader(res.GetResponseStream()))
                         {
-                            RenewAccessTokenRequested = true;
-                            OnChildLogString?.Invoke(this, "Access Token: " + json_result.access_token);
-                            SetConnectState(true, null, json_result.access_token);
-                        }
-                        else
-                        {
-                            SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
+                            var resstring = reader.ReadToEnd();
+
+                            json_login_result json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<json_login_result>(resstring);
+
+                            if (json_result != null)
+                            {
+                                if (! string.IsNullOrEmpty(json_result.access_token))
+                                {
+                                    RenewAccessTokenRequested = true;
+                                    OnChildLogString?.Invoke(this, "Access Token: " + json_result.access_token);
+                                    SetConnectState(true, null, json_result.access_token);
+                                }
+                                else
+                                {
+                                    SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
+                                }
+                            }
+                            else
+                            {
+                                SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
+                            }
                         }
                     }
                     else
                     {
                         SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
                     }
-                }
-                else
-                {
-                    SetConnectState(false, "http request error: " + res.StatusCode + " " + res.StatusDescription);
                 }
 
             }
@@ -532,7 +601,8 @@ namespace Wamp.Client
         private void ResetChannel()
         /***********************************************************************************************************************/
         {
-            // close WAMP channel if it is
+            DetachMonitorEvents();
+
             if (_wampChannel != null)
             {
                 try
@@ -543,27 +613,33 @@ namespace Wamp.Client
                 {
                     OnChildLogString?.Invoke(this, "Exception in ResetChannel(): " + ex.ToString());
                 }
+                finally
+                {
+                    _wampChannel = null;
+                }
             }
 
-            // reset proxy
             _wampRealmProxy = null;
         }
-
 
         /***********************************************************************************************************************/
         private void SetConnectState(bool connected, string error, string token = null)
         /***********************************************************************************************************************/
         {
-             if (connected)
+            lock (_connectionGate)
+            {
+                if (_isStopping)
+                    return;
+            }
+
+            if (connected)
             {
                 OnChildLogString?.Invoke(this, "WampConnection.SetConnectState. Connected: True.");
 
                 StopReconnect();
 
-                // create authenticator
                 _wampAuthenticator = new TicketAuthenticator(UserName, token);
 
-                // try to open channel
                 OpenChannel();
             }
             else
@@ -572,15 +648,8 @@ namespace Wamp.Client
 
                 OnError?.Invoke(this, error);
 
-                if (RenewAccessTokenTimer != null)
-                {
-                    //Delete timer
-                    RenewAccessTokenTimer.Dispose();
-                    RenewAccessTokenTimer = null;
-                    RenewAccessTokenRequested = false;
-                }
+                StopRenewAccessTokenTimer();
 
-                // Start reconnect
                 ResetChannel();
                 Start();
             }
@@ -591,7 +660,8 @@ namespace Wamp.Client
         private void OpenChannel()
         /***********************************************************************************************************************/
         {
-            // create channel factory
+            ResetChannel();
+
             IWampChannelFactory factory = new WampChannelFactory();
 
             if (WampPort.Equals(WampEncryptedPort))

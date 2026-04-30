@@ -54,11 +54,18 @@ namespace Wamp.Client
         {
             try
             {
-                // Fast path: already subscribed
+                const string key = "_global";
+
                 lock (_gpoTraceGate)
                 {
-                    if (_gpoSubscriptions.Count > 0)
+                    if (_gpoSubscriptions.ContainsKey(key))
                         return;
+                }
+
+                if (_wampRealmProxy == null)
+                {
+                    OnChildLogString?.Invoke(this, "TraceDeviceGPOStatusEvent skipped. WAMP realm proxy is not available.");
+                    return;
                 }
 
                 var options = new TraceDeviceGPOOptions();
@@ -75,18 +82,18 @@ namespace Wamp.Client
 
                 var subscription = await topicProxy.Subscribe(tracer, options).ConfigureAwait(false);
 
-                // Commit subscription under gate, handle race (double-subscribe).
                 lock (_gpoTraceGate)
                 {
-                    if (_gpoSubscriptions.Count > 0)
+                    if (_gpoSubscriptions.ContainsKey(key))
                     {
-                        // Someone subscribed concurrently; discard this subscription.
-                        subscription.DisposeAsync();
+                        tracer.OnDeviceGPOStatusEvent -= TracerDeviceGPOStatusEvent_OnDeviceGPOStatusEvent;
+                        tracer.OnDebugString -= TracerDeviceGPOStatusEvent_OnDebugString;
+                        subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
                         return;
                     }
 
-                    _gpoTracers["_global"] = tracer;
-                    _gpoSubscriptions["_global"] = subscription;
+                    _gpoTracers[key] = tracer;
+                    _gpoSubscriptions[key] = subscription;
                 }
             }
             catch (WampException wex) when (wex.ErrorUri == "wamp.error.not_authorized")
@@ -95,7 +102,7 @@ namespace Wamp.Client
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "TraceDeviceGPOStatusEvent - Exception: " + ex.Message);
+                OnChildLogString?.Invoke(this, "TraceDeviceGPOStatusEvent - Exception: " + ex);
             }
         }
 
@@ -134,28 +141,7 @@ namespace Wamp.Client
             if (string.IsNullOrEmpty(dirNo))
                 return;
 
-            IAsyncDisposable subscription = null;
-
-            lock (_gpoTraceGate)
-            {
-                if (_gpoSubscriptions.TryGetValue(dirNo, out subscription))
-                {
-                    _gpoSubscriptions.Remove(dirNo);
-                    _gpoTracers.Remove(dirNo);
-                }
-            }
-
-            if (subscription != null)
-            {
-                try
-                {
-                    subscription.DisposeAsync();
-                }
-                catch (Exception ex)
-                {
-                    OnChildLogString?.Invoke(this, "Exception disposing GPO subscription: " + ex);
-                }
-            }
+            DisposeGpoSubscription(dirNo);
         }
 
         /// <summary>
@@ -163,25 +149,47 @@ namespace Wamp.Client
         /// </summary>
         public void TraceDeviceGPOStatusEventDispose()
         {
-            List<IAsyncDisposable> subscriptions;
+            List<string> keys;
 
             lock (_gpoTraceGate)
             {
-                subscriptions = new List<IAsyncDisposable>(_gpoSubscriptions.Values);
-                _gpoSubscriptions.Clear();
-                _gpoTracers.Clear();
+                keys = new List<string>(_gpoSubscriptions.Keys);
             }
 
-            foreach (var sub in subscriptions)
+            foreach (string key in keys)
+                DisposeGpoSubscription(key);
+        }
+
+        private void DisposeGpoSubscription(string key)
+        {
+            TracerDeviceGPOStatusEvent tracer = null;
+            IAsyncDisposable subscription = null;
+
+            lock (_gpoTraceGate)
             {
-                try
-                {
-                    sub.DisposeAsync();
-                }
-                catch (Exception ex)
-                {
-                    OnChildLogString?.Invoke(this, "Exception disposing GPO subscription: " + ex);
-                }
+                _gpoTracers.TryGetValue(key, out tracer);
+                _gpoSubscriptions.TryGetValue(key, out subscription);
+
+                _gpoTracers.Remove(key);
+                _gpoSubscriptions.Remove(key);
+            }
+
+            if (tracer != null)
+            {
+                tracer.OnDeviceGPOStatusEvent -= TracerDeviceGPOStatusEvent_OnDeviceGPOStatusEvent;
+                tracer.OnDebugString -= TracerDeviceGPOStatusEvent_OnDebugString;
+            }
+
+            if (subscription == null)
+                return;
+
+            try
+            {
+                subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception disposing GPO subscription: " + ex);
             }
         }
 
@@ -235,11 +243,13 @@ namespace Wamp.Client
                 if (arguments == null || arguments.Length == 0 || arguments[0] == null)
                     return;
 
-                string json_str = arguments[0].ToString();
-                OnDebugString?.Invoke(this, json_str);
+                string json = arguments[0].ToString();
+                OnDebugString?.Invoke(this, json);
 
-                var gpioElement = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_device_gpio_element>(json_str);
-                OnDeviceGPOStatusEvent?.Invoke(this, gpioElement);
+                var gpioElement = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_device_gpio_element>(json);
+
+                if (gpioElement != null)
+                    OnDeviceGPOStatusEvent?.Invoke(this, gpioElement);
             }
 
             public void Event<TMessage>(

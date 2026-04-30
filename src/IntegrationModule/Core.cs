@@ -185,6 +185,12 @@ namespace ConnectPro
         /// </summary>
         public bool Start()
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Core));
+
+            if (_isRuning)
+                return true;
+
             /*
              * Load order is important!
              * 
@@ -265,13 +271,11 @@ namespace ConnectPro
 
             if (disposing)
             {
-                // Unsubscribe from events
-                if (_events != null)
-                {
-                    _events.OnConnectionChanged -= HandleConnectionChanged;
-                }
+                _isRuning = false;
 
-                // Dispose managed resources
+                if (_events != null)
+                    _events.OnConnectionChanged -= HandleConnectionChanged;
+
                 SystemMonitor?.Dispose();
                 DeviceHandler?.Dispose();
                 AudioEventHandler?.Dispose();
@@ -281,8 +285,8 @@ namespace ConnectPro
                 CallForwardingHandler?.Dispose();
                 Log?.Dispose();
                 ConnectionHandler?.Dispose();
+                _wamp?.Dispose();
 
-                // Ensure fields are cleared to release references
                 SystemMonitor = null;
                 DeviceHandler = null;
                 AudioEventHandler = null;

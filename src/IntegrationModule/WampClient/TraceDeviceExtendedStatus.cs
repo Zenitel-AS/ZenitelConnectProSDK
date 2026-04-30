@@ -2,127 +2,158 @@
 using System.Collections.Generic;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
-using WampSharp.V2.PubSub;
 using WampSharp.V2.Core.Contracts;
-
+using WampSharp.V2.PubSub;
 
 namespace Wamp.Client
 {
 
     public partial class WampClient
     {
-        /***********************************************************************************************************************/
-        /********************                 Device Extended Status Event Subscription                         *******************/
-        /***********************************************************************************************************************/
+        private readonly object _traceDeviceExtendedStatusEventGate = new object();
 
-        TracerDeviceExtendedStatusEvent tracerDeviceExtendedStatusEvent = null;
-        IAsyncDisposable tracerDeviceExtendedStatusEventDisposable = null;
+        private TracerDeviceExtendedStatusEvent tracerDeviceExtendedStatusEvent;
+        private IAsyncDisposable tracerDeviceExtendedStatusEventDisposable;
 
-        /// <summary>
-        /// If set (not null) Device Registration changes will be sent to event handler  OnWampDeviceRegistrationEven
-        /// </summary>
         public event EventHandler<wamp_device_extended_status> OnWampDeviceExtendedStatusEvent;
 
-
-        /// <summary>
-        /// This method enables the subscription of Device Registration Status Changes.
-        /// </summary>
-        /***********************************************************************************************************************/
         public async void TraceDeviceExtendedStatusEvent()
-        /***********************************************************************************************************************/
         {
-            IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceDeviceExtendedStatus);
+            try
+            {
+                lock (_traceDeviceExtendedStatusEventGate)
+                {
+                    if (tracerDeviceExtendedStatusEventDisposable != null)
+                        return;
+                }
 
-            tracerDeviceExtendedStatusEvent = new TracerDeviceExtendedStatusEvent();
-            tracerDeviceExtendedStatusEvent.OnDeviceExtendedStatusEvent += TracerDeviceExtendedStatusEvent_OnRegistrationEvent;
-            tracerDeviceExtendedStatusEvent.OnDebugString += TracerDeviceRegistrationEvent_OnDebugString;
+                if (_wampRealmProxy == null)
+                {
+                    OnChildLogString?.Invoke(this, "TraceDeviceExtendedStatusEvent skipped. WAMP realm proxy is not available.");
+                    return;
+                }
 
-            tracerDeviceExtendedStatusEventDisposable = await topicProxy.Subscribe(tracerDeviceExtendedStatusEvent, new SubscribeOptions()).ConfigureAwait(false);
+                IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceDeviceExtendedStatus);
+
+                var tracer = new TracerDeviceExtendedStatusEvent();
+                tracer.OnDeviceExtendedStatusEvent += TracerDeviceExtendedStatusEvent_OnRegistrationEvent;
+                tracer.OnDebugString += TracerDeviceExtendedStatusEvent_OnDebugString;
+
+                IAsyncDisposable subscription = await topicProxy
+                    .Subscribe(tracer, new SubscribeOptions())
+                    .ConfigureAwait(false);
+
+                lock (_traceDeviceExtendedStatusEventGate)
+                {
+                    if (tracerDeviceExtendedStatusEventDisposable != null)
+                    {
+                        tracer.OnDeviceExtendedStatusEvent -= TracerDeviceExtendedStatusEvent_OnRegistrationEvent;
+                        tracer.OnDebugString -= TracerDeviceExtendedStatusEvent_OnDebugString;
+                        subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        return;
+                    }
+
+                    tracerDeviceExtendedStatusEvent = tracer;
+                    tracerDeviceExtendedStatusEventDisposable = subscription;
+                }
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception in TraceDeviceExtendedStatusEvent: " + ex);
+            }
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerDeviceExtendedStatusEvent_OnDebugString(object sender, string e)
-        /***********************************************************************************************************************/
         {
             OnChildLogString?.Invoke(this, "Device Extended Status Event: " + e);
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerDeviceExtendedStatusEvent_OnRegistrationEvent(object sender, wamp_device_extended_status deviceStat)
-        /***********************************************************************************************************************/
         {
             OnWampDeviceExtendedStatusEvent?.Invoke(this, deviceStat);
         }
 
-        /// <summary>This method terminates the subscription of Device Registration Status Updates.</summary>
-        /***********************************************************************************************************************/
         public void TraceDeviceExtendedStatusEventDispose()
-        /***********************************************************************************************************************/
         {
-            if (tracerDeviceExtendedStatusEventDisposable != null)
+            TracerDeviceExtendedStatusEvent tracer = null;
+            IAsyncDisposable subscription = null;
+
+            lock (_traceDeviceExtendedStatusEventGate)
             {
-                tracerDeviceExtendedStatusEventDisposable.DisposeAsync();
-                tracerDeviceExtendedStatusEventDisposable = null;
+                tracer = tracerDeviceExtendedStatusEvent;
+                subscription = tracerDeviceExtendedStatusEventDisposable;
+
                 tracerDeviceExtendedStatusEvent = null;
+                tracerDeviceExtendedStatusEventDisposable = null;
+            }
+
+            if (tracer != null)
+            {
+                tracer.OnDeviceExtendedStatusEvent -= TracerDeviceExtendedStatusEvent_OnRegistrationEvent;
+                tracer.OnDebugString -= TracerDeviceExtendedStatusEvent_OnDebugString;
+            }
+
+            if (subscription == null)
+                return;
+
+            try
+            {
+                subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception disposing TraceDeviceExtendedStatusEvent subscription: " + ex);
             }
         }
 
-
-        /// <summary>This method returns the status of Device Registration changes subscription.</summary>
-        /// <returns>DEvice Registration Status change subscription enabled/disabled as true/false.</returns>
-        /***********************************************************************************************************************/
         public bool TraceDeviceExtendedStatusIsEnabled()
-        /***********************************************************************************************************************/
         {
-            if (tracerDeviceExtendedStatusEvent == null)
+            lock (_traceDeviceExtendedStatusEventGate)
             {
-                return false;
-            }
-            else
-            {
-                return true;
+                return tracerDeviceExtendedStatusEventDisposable != null;
             }
         }
 
-
-        /***********************************************************************************************************************/
         internal class TracerDeviceExtendedStatusEvent : IWampRawTopicClientSubscriber
-        /***********************************************************************************************************************/
         {
-
             public event EventHandler<wamp_device_extended_status> OnDeviceExtendedStatusEvent;
             public event EventHandler<string> OnDebugString;
 
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details)
             {
                 OnDebugString?.Invoke(this, "Got event with publication id: " + publicationId);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments)
             {
-                string json_str = arguments[0].ToString();
-                OnDebugString?.Invoke(this, json_str);
+                if (arguments == null || arguments.Length == 0 || arguments[0] == null)
+                    return;
 
-                wamp_device_extended_status regUpdate = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_device_extended_status>(arguments[0].ToString());
-                OnDeviceExtendedStatusEvent?.Invoke(this, regUpdate);
+                string json = arguments[0].ToString();
+                OnDebugString?.Invoke(this, json);
+
+                var deviceStatus = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_device_extended_status>(json);
+
+                if (deviceStatus != null)
+                    OnDeviceExtendedStatusEvent?.Invoke(this, deviceStatus);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments,
-                                        IDictionary<string, TMessage> argumentsKeywords)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments,
+                IDictionary<string, TMessage> argumentsKeywords)
             {
-                OnDebugString?.Invoke(this, "Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments, IDictionary<string, TMessage> argumentsKeywords) IS NOT SUPPORTED");
+                OnDebugString?.Invoke(this, "Event with argumentsKeywords is not supported.");
             }
-
         }
     }
 }

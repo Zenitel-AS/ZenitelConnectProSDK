@@ -2,130 +2,157 @@
 using System.Collections.Generic;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
-using WampSharp.V2.PubSub;
 using WampSharp.V2.Core.Contracts;
-
-
+using WampSharp.V2.PubSub;
 
 namespace Wamp.Client
 {
     public partial class WampClient
     {
-        /***********************************************************************************************************************/
-        /********************                         Trace Call Leg Status Event                            *******************/
-        /***********************************************************************************************************************/
+        private readonly object _traceCallLegEventGate = new object();
 
-        TracerCallLegEvent tracerCallLegEvent = null;
-        IAsyncDisposable tracerCallLegEventDisposable = null;
+        private TracerCallLegEvent tracerCallLegEvent;
+        private IAsyncDisposable tracerCallLegEventDisposable;
 
-        /// <summary>
-        /// If set (not null) Call Leg Status changes will be sent to event handler OnWampCallQueueStatusEvent
-        /// </summary>
         public event EventHandler<wamp_call_leg_element> OnWampCallLegStatusEvent;
 
-
-        /// <summary>
-        /// This method enables the subscription of Call Leg Status Changes.
-        /// </summary>
-        /***********************************************************************************************************************/
         public async void TraceCallLegEvent()
-        /***********************************************************************************************************************/
         {
-            IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampCallLeg);
+            try
+            {
+                lock (_traceCallLegEventGate)
+                {
+                    if (tracerCallLegEventDisposable != null)
+                        return;
+                }
 
-            tracerCallLegEvent = new TracerCallLegEvent();
-            tracerCallLegEvent.OnCallLegEvent +=TracerCallLegEvent_OnCallLegEvent;
-            tracerCallLegEvent.OnDebugString  +=TracerCallLegEvent_OnDebugString;
+                if (_wampRealmProxy == null)
+                {
+                    OnChildLogString?.Invoke(this, "TraceCallLegEvent skipped. WAMP realm proxy is not available.");
+                    return;
+                }
 
-            tracerCallLegEventDisposable = await topicProxy.Subscribe(tracerCallLegEvent, new SubscribeOptions()).ConfigureAwait(false);
+                IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampCallLeg);
+
+                var tracer = new TracerCallLegEvent();
+                tracer.OnCallLegEvent += TracerCallLegEvent_OnCallLegEvent;
+                tracer.OnDebugString += TracerCallLegEvent_OnDebugString;
+
+                IAsyncDisposable subscription = await topicProxy
+                    .Subscribe(tracer, new SubscribeOptions())
+                    .ConfigureAwait(false);
+
+                lock (_traceCallLegEventGate)
+                {
+                    if (tracerCallLegEventDisposable != null)
+                    {
+                        tracer.OnCallLegEvent -= TracerCallLegEvent_OnCallLegEvent;
+                        tracer.OnDebugString -= TracerCallLegEvent_OnDebugString;
+                        subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        return;
+                    }
+
+                    tracerCallLegEvent = tracer;
+                    tracerCallLegEventDisposable = subscription;
+                }
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception in TraceCallLegEvent: " + ex);
+            }
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerCallLegEvent_OnDebugString(object sender, string e)
-        /***********************************************************************************************************************/
         {
             OnChildLogString?.Invoke(this, "Call Leg Subscription Event: " + e);
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerCallLegEvent_OnCallLegEvent(object sender, wamp_call_leg_element callQueueUpd)
-        /***********************************************************************************************************************/
         {
             OnWampCallLegStatusEvent?.Invoke(this, callQueueUpd);
         }
 
-
-        /// <summary>This method terminates the subscription of Call Leg Status Updates.</summary>
-        /***********************************************************************************************************************/
         public void TraceCallLegEventDispose()
-        /***********************************************************************************************************************/
         {
-            if (tracerCallLegEventDisposable != null)
+            TracerCallLegEvent tracer = null;
+            IAsyncDisposable subscription = null;
+
+            lock (_traceCallLegEventGate)
             {
-                tracerCallLegEventDisposable.DisposeAsync();
-                tracerCallLegEventDisposable = null;
+                tracer = tracerCallLegEvent;
+                subscription = tracerCallLegEventDisposable;
+
                 tracerCallLegEvent = null;
+                tracerCallLegEventDisposable = null;
+            }
+
+            if (tracer != null)
+            {
+                tracer.OnCallLegEvent -= TracerCallLegEvent_OnCallLegEvent;
+                tracer.OnDebugString -= TracerCallLegEvent_OnDebugString;
+            }
+
+            if (subscription == null)
+                return;
+
+            try
+            {
+                subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception disposing TraceCallLegEvent subscription: " + ex);
             }
         }
 
-        /// <summary>This method returns the status of Call Leg Status changes subscription.</summary>
-        /// <returns>Call Leg Status change subscription enabled/disabled as true/false.</returns>
-        /***********************************************************************************************************************/
         public bool TraceCallLegEventIsEnabled()
-        /***********************************************************************************************************************/
         {
-            if (tracerCallLegEvent == null)
+            lock (_traceCallLegEventGate)
             {
-                return false;
-            }
-            else
-            {
-                return true;
+                return tracerCallLegEventDisposable != null;
             }
         }
 
-
-        /***********************************************************************************************************************/
         internal class TracerCallLegEvent : IWampRawTopicClientSubscriber
-        /***********************************************************************************************************************/
         {
-
             public event EventHandler<wamp_call_leg_element> OnCallLegEvent;
             public event EventHandler<string> OnDebugString;
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details)
             {
                 OnDebugString?.Invoke(this, "Got event with publication id: " + publicationId);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments)
             {
-                string json_str = arguments[0].ToString();
-                OnDebugString?.Invoke(this, json_str);
+                if (arguments == null || arguments.Length == 0 || arguments[0] == null)
+                    return;
 
-                wamp_call_leg_element callQueueUpdate = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_call_leg_element>(arguments[0].ToString());
-                OnCallLegEvent?.Invoke(this, callQueueUpdate);
+                string json = arguments[0].ToString();
+                OnDebugString?.Invoke(this, json);
+
+                var callQueueUpdate = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_call_leg_element>(json);
+
+                if (callQueueUpdate != null)
+                    OnCallLegEvent?.Invoke(this, callQueueUpdate);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments,
-                                        IDictionary<string, TMessage> argumentsKeywords)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments,
+                IDictionary<string, TMessage> argumentsKeywords)
             {
-                OnDebugString?.Invoke(this, "Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments, IDictionary<string, TMessage> argumentsKeywords) IS NOT SUPPORTED");
+                OnDebugString?.Invoke(this, "Event with argumentsKeywords is not supported.");
             }
-
         }
     }
 }
-
-

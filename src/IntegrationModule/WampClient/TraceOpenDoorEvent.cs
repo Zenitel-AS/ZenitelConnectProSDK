@@ -2,128 +2,156 @@
 using System.Collections.Generic;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
-using WampSharp.V2.PubSub;
 using WampSharp.V2.Core.Contracts;
-
+using WampSharp.V2.PubSub;
 
 namespace Wamp.Client
 {
     public partial class WampClient
     {
-        /***********************************************************************************************************************/
-        /********************                         Trace Open Door Event                                  *******************/
-        /***********************************************************************************************************************/
+        private readonly object _traceOpenDoorEventGate = new object();
 
-        TracerOpenDoorEvent tracerOpenDoorEvent = null;
- 
-        IAsyncDisposable  tracerOpenDoorEventDisposable = null;
+        private TracerOpenDoorEvent tracerOpenDoorEvent;
+        private IAsyncDisposable tracerOpenDoorEventDisposable;
 
-        /// <summary>
-        /// If set (not null) Open Door Event will be sent to event handler OnWampOpenDoorEvent
-        /// </summary>
         public event EventHandler<wamp_open_door_event> OnWampOpenDoorEvent;
 
-
-        /// <summary>
-        /// This method enables the subscription of Open Door Activation Event.
-        /// </summary>
-        /***********************************************************************************************************************/
         public async void TraceOpenDoorEvent()
-        /***********************************************************************************************************************/       
         {
-            IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampSystemOpenDoor);
+            try
+            {
+                lock (_traceOpenDoorEventGate)
+                {
+                    if (tracerOpenDoorEventDisposable != null)
+                        return;
+                }
 
-            tracerOpenDoorEvent = new TracerOpenDoorEvent();
-            tracerOpenDoorEvent.OnOpenDoorEvent += TracerOpenDoorEvent_OnOpenDoorEvent;
-            tracerOpenDoorEvent.OnDebugString += TracerOpenDoorEvent_OnDebugString;
+                if (_wampRealmProxy == null)
+                {
+                    OnChildLogString?.Invoke(this, "TraceOpenDoorEvent skipped. WAMP realm proxy is not available.");
+                    return;
+                }
 
-            tracerOpenDoorEventDisposable = await topicProxy.Subscribe(tracerOpenDoorEvent, new SubscribeOptions()).ConfigureAwait(false);
+                IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampSystemOpenDoor);
+
+                var tracer = new TracerOpenDoorEvent();
+                tracer.OnOpenDoorEvent += TracerOpenDoorEvent_OnOpenDoorEvent;
+                tracer.OnDebugString += TracerOpenDoorEvent_OnDebugString;
+
+                IAsyncDisposable subscription = await topicProxy
+                    .Subscribe(tracer, new SubscribeOptions())
+                    .ConfigureAwait(false);
+
+                lock (_traceOpenDoorEventGate)
+                {
+                    if (tracerOpenDoorEventDisposable != null)
+                    {
+                        tracer.OnOpenDoorEvent -= TracerOpenDoorEvent_OnOpenDoorEvent;
+                        tracer.OnDebugString -= TracerOpenDoorEvent_OnDebugString;
+                        subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        return;
+                    }
+
+                    tracerOpenDoorEvent = tracer;
+                    tracerOpenDoorEventDisposable = subscription;
+                }
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception in TraceOpenDoorEvent: " + ex);
+            }
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerOpenDoorEvent_OnDebugString(object sender, string e)
-        /***********************************************************************************************************************/
         {
-            OnChildLogString?.Invoke(this, "Call Subscription Event: " + e);
+            OnChildLogString?.Invoke(this, "Open Door Subscription Event: " + e);
         }
 
-
-        /***********************************************************************************************************************/
         private void TracerOpenDoorEvent_OnOpenDoorEvent(object sender, wamp_open_door_event openDoorEvent)
-        /***********************************************************************************************************************/       
         {
             OnWampOpenDoorEvent?.Invoke(this, openDoorEvent);
         }
 
-
-        /// <summary>This method terminates the subscription ofOpen Door Event.</summary>
-        /***********************************************************************************************************************/
         public void TraceOpenDoorEventDispose()
-        /***********************************************************************************************************************/
         {
-            if (tracerOpenDoorEventDisposable != null)
+            TracerOpenDoorEvent tracer = null;
+            IAsyncDisposable subscription = null;
+
+            lock (_traceOpenDoorEventGate)
             {
-                tracerOpenDoorEventDisposable.DisposeAsync();
-                tracerOpenDoorEventDisposable = null;
+                tracer = tracerOpenDoorEvent;
+                subscription = tracerOpenDoorEventDisposable;
+
                 tracerOpenDoorEvent = null;
+                tracerOpenDoorEventDisposable = null;
+            }
+
+            if (tracer != null)
+            {
+                tracer.OnOpenDoorEvent -= TracerOpenDoorEvent_OnOpenDoorEvent;
+                tracer.OnDebugString -= TracerOpenDoorEvent_OnDebugString;
+            }
+
+            if (subscription == null)
+                return;
+
+            try
+            {
+                subscription.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception disposing TraceOpenDoorEvent subscription: " + ex);
             }
         }
 
-
-        /// <summary>This method returns the status of the Open Door Event subscription.</summary>
-        /// <returns>Open Door Subscription Event enabled/disabled as true/false.</returns>
-        /***********************************************************************************************************************/
         public bool TraceOpenDoorEventIsEnabled()
-        /***********************************************************************************************************************/
         {
-            if (tracerOpenDoorEvent == null)
+            lock (_traceOpenDoorEventGate)
             {
-                return false;
-            }
-            else
-            {
-                return true;
+                return tracerOpenDoorEventDisposable != null;
             }
         }
 
-
-        /***********************************************************************************************************************/
         internal class TracerOpenDoorEvent : IWampRawTopicClientSubscriber
-        /***********************************************************************************************************************/
         {
-
             public event EventHandler<wamp_open_door_event> OnOpenDoorEvent;
             public event EventHandler<string> OnDebugString;
 
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details)
             {
-                string txt = "Got event with publication id: " + publicationId.ToString();
-                OnDebugString?.Invoke(this, txt);
+                OnDebugString?.Invoke(this, "Got event with publication id: " + publicationId);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments)
             {
-                string json_str = arguments[0].ToString();
-                OnDebugString?.Invoke(this, json_str);
+                if (arguments == null || arguments.Length == 0 || arguments[0] == null)
+                    return;
 
-                wamp_open_door_event openDoorEvent = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_open_door_event>(arguments[0].ToString());
-                OnOpenDoorEvent?.Invoke(this, openDoorEvent);
+                string json = arguments[0].ToString();
+                OnDebugString?.Invoke(this, json);
+
+                var openDoorEvent = Newtonsoft.Json.JsonConvert.DeserializeObject<wamp_open_door_event>(json);
+
+                if (openDoorEvent != null)
+                    OnOpenDoorEvent?.Invoke(this, openDoorEvent);
             }
 
-
-            /***********************************************************************************************************************/
-            public void Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments,
-                                        IDictionary<string, TMessage> argumentsKeywords)
-            /***********************************************************************************************************************/
+            public void Event<TMessage>(
+                IWampFormatter<TMessage> formatter,
+                long publicationId,
+                EventDetails details,
+                TMessage[] arguments,
+                IDictionary<string, TMessage> argumentsKeywords)
             {
-                string txt = "Event<TMessage>(IWampFormatter<TMessage> formatter, long publicationId, EventDetails details, TMessage[] arguments, IDictionary<string, TMessage> argumentsKeywords) IS NOT SUPPORTED";
-                OnDebugString?.Invoke(this, txt);
+                OnDebugString?.Invoke(this, "Event with argumentsKeywords is not supported.");
             }
         }
     }
