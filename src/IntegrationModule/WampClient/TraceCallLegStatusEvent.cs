@@ -14,8 +14,14 @@ namespace Wamp.Client
         private TracerCallLegEvent tracerCallLegEvent;
         private IAsyncDisposable tracerCallLegEventDisposable;
 
+        /// <summary>
+        /// Occurs when the state of a call leg changes on the WAMP event stream.
+        /// </summary>
         public event EventHandler<wamp_call_leg_element> OnWampCallLegStatusEvent;
 
+        /// <summary>
+        /// Subscribes to call leg status notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceCallLegEvent()
         {
             try
@@ -72,6 +78,9 @@ namespace Wamp.Client
             OnWampCallLegStatusEvent?.Invoke(this, callQueueUpd);
         }
 
+        /// <summary>
+        /// Disposes the call leg status subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceCallLegEventDispose()
         {
             TracerCallLegEvent tracer = null;
@@ -105,6 +114,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the call leg status subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceCallLegEventIsEnabled()
         {
             lock (_traceCallLegEventGate)

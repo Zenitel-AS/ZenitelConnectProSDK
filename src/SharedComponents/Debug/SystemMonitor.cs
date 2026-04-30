@@ -38,7 +38,7 @@ namespace ConnectPro
         /// </summary>
         /// <param name="events">The event system used for exception handling.</param>
         /// <param name="configuration">The application configuration containing log file paths.</param>
-        /// <param name="_wamp">The WAMP client used for handling log messages.</param>
+        /// <param name="wamp">The WAMP client used for handling child log messages.</param>
         public SystemMonitor(Events events, Configuration configuration, ref WampClient wamp)
         {
             _events = events ?? throw new ArgumentNullException(nameof(events));
@@ -77,7 +77,7 @@ namespace ConnectPro
         /// Handles log messages from the WAMP client and logs them as warnings.
         /// </summary>
         /// <param name="sender">The source of the log message.</param>
-        /// <param name="ex">The log message string.</param>
+        /// <param name="message">The log message text received from the WAMP client.</param>
         private void HandleWampChildLogString(object sender, string message)
         {
             if (string.IsNullOrEmpty(message)) return;
@@ -98,12 +98,19 @@ namespace ConnectPro
 
         private bool _disposed = false;
 
+        /// <summary>
+        /// Releases logger resources and detaches the monitor from application and WAMP events.
+        /// </summary>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases the resources used by the monitor.
+        /// </summary>
+        /// <param name="disposing"><see langword="true"/> to release managed resources; otherwise, <see langword="false"/>.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;

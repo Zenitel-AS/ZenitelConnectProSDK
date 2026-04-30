@@ -14,8 +14,14 @@ namespace Wamp.Client
         private TracerAudioEventDetection tracerAudioEventDetection;
         private IAsyncDisposable tracerAudioEventDetectionsDisposable;
 
+        /// <summary>
+        /// Occurs when the audio analytics pipeline detects an audio event.
+        /// </summary>
         public event EventHandler<wamp_audio_event_detection> OnAudioEventDetection;
 
+        /// <summary>
+        /// Subscribes to audio event detection notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceAudioEventDetection()
         {
             try
@@ -72,6 +78,9 @@ namespace Wamp.Client
             OnAudioEventDetection?.Invoke(this, audioEvent);
         }
 
+        /// <summary>
+        /// Disposes the audio event detection subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceAudioEventDetectionDispose()
         {
             TracerAudioEventDetection tracer = null;
@@ -105,6 +114,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the audio event detection subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceAudioEventDetectionIsEnabled()
         {
             lock (_traceAudioEventDetectionGate)

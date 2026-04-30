@@ -13,6 +13,10 @@ namespace ConnectPro.Models
     [Serializable]
     public sealed class CallQueue
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CallQueue"/> class from a WAMP queue payload.
+        /// </summary>
+        /// <param name="wampQueue">The WAMP queue element to convert.</param>
         public CallQueue(Wamp.Client.WampClient.wamp_call_queue_element wampQueue)
         {
             queue_dirno = wampQueue.queue_dirno;
@@ -57,6 +61,9 @@ namespace ConnectPro.Models
         /// </summary>
         public List<string> operators { get; set; }
 
+        /// <summary>
+        /// Initializes a new empty instance of the <see cref="CallQueue"/> class.
+        /// </summary>
         public CallQueue()
         {
             queue_dirno = string.Empty;

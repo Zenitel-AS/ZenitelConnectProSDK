@@ -260,6 +260,10 @@ namespace ConnectPro
             }
         }
 
+        /// <summary>
+        /// Initiates a reconnect attempt asynchronously.
+        /// </summary>
+        /// <returns>A task that represents the reconnect request.</returns>
         public async Task RecoonectAsync()
         {
             Recconect();

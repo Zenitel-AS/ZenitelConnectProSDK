@@ -15,8 +15,14 @@ namespace Wamp.Client
         private TracerDeviceRegistrationEvent tracerDeviceRegistrationEvent;
         private IAsyncDisposable tracerDeviceRegistrationEventDisposable;
 
+        /// <summary>
+        /// Occurs when a device registration update is received from the WAMP event stream.
+        /// </summary>
         public event EventHandler<wamp_device_registration_element> OnWampDeviceRegistrationEvent;
 
+        /// <summary>
+        /// Subscribes to device registration notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceDeviceRegistrationEvent()
         {
             try
@@ -73,6 +79,9 @@ namespace Wamp.Client
             OnWampDeviceRegistrationEvent?.Invoke(this, regUpd);
         }
 
+        /// <summary>
+        /// Disposes the device registration subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceDeviceRegistrationEventDispose()
         {
             TracerDeviceRegistrationEvent tracer = null;
@@ -106,6 +115,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the device registration subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceDeviceRegistrationIsEnabled()
         {
             lock (_traceDeviceRegistrationEventGate)

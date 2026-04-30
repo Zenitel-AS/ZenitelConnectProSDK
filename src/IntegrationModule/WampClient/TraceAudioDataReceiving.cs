@@ -14,8 +14,14 @@ namespace Wamp.Client
         private TracerAudioDataReceiving tracerAudioDataReceiving;
         private IAsyncDisposable tracerAudioDataReceivingsDisposable;
 
+        /// <summary>
+        /// Occurs when the audio data receiving status changes for a monitored audio source.
+        /// </summary>
         public event EventHandler<wamp_audio_data_receiving> OnAudioDataReceiving;
 
+        /// <summary>
+        /// Subscribes to audio data receiving notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceAudioDataReceiving()
         {
             try
@@ -72,6 +78,9 @@ namespace Wamp.Client
             OnAudioDataReceiving?.Invoke(this, audioEvent);
         }
 
+        /// <summary>
+        /// Disposes the audio data receiving subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceAudioDataReceivingDispose()
         {
             TracerAudioDataReceiving tracer = null;
@@ -105,6 +114,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the audio data receiving subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceAudioDataReceivingIsEnabled()
         {
             lock (_traceAudioDataReceivingGate)

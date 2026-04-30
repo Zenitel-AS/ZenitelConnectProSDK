@@ -15,8 +15,14 @@ namespace Wamp.Client
         private TracerDeviceExtendedStatusEvent tracerDeviceExtendedStatusEvent;
         private IAsyncDisposable tracerDeviceExtendedStatusEventDisposable;
 
+        /// <summary>
+        /// Occurs when extended device test status information is published by the WAMP backend.
+        /// </summary>
         public event EventHandler<wamp_device_extended_status> OnWampDeviceExtendedStatusEvent;
 
+        /// <summary>
+        /// Subscribes to device extended status notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceDeviceExtendedStatusEvent()
         {
             try
@@ -73,6 +79,9 @@ namespace Wamp.Client
             OnWampDeviceExtendedStatusEvent?.Invoke(this, deviceStat);
         }
 
+        /// <summary>
+        /// Disposes the device extended status subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceDeviceExtendedStatusEventDispose()
         {
             TracerDeviceExtendedStatusEvent tracer = null;
@@ -106,6 +115,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the device extended status subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceDeviceExtendedStatusIsEnabled()
         {
             lock (_traceDeviceExtendedStatusEventGate)

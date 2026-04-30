@@ -800,6 +800,10 @@ namespace ConnectPro.Handlers
             return queues;
         }
 
+        /// <summary>
+        /// Retrieves configured queues from the backend and reconciles them with the locally cached queue list.
+        /// </summary>
+        /// <returns>A task that represents the asynchronous queue reconciliation operation.</returns>
         public async Task RetrieveQueues()
         {
             lock (_queueRetrievalLock)
@@ -862,6 +866,11 @@ namespace ConnectPro.Handlers
             }
         }
 
+        /// <summary>
+        /// Retrieves the configured call queues from the backend.
+        /// </summary>
+        /// <param name="queueDirno">An optional queue directory number used to filter the result.</param>
+        /// <returns>A list of configured queues that match the supplied filter.</returns>
         public List<CallQueue> GetAllDefinedQueues(string queueDirno = "")
         {
             List<CallQueue> queues = new List<CallQueue>();
@@ -1183,6 +1192,10 @@ namespace ConnectPro.Handlers
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases timers, event subscriptions, and other managed resources used by the call handler.
+        /// </summary>
+        /// <param name="disposing"><see langword="true"/> to release managed resources; otherwise, <see langword="false"/>.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)
@@ -1240,6 +1253,11 @@ namespace ConnectPro.Handlers
         }
 
 
+        /// <summary>
+        /// Determines whether the specified call state should be treated as a busy state.
+        /// </summary>
+        /// <param name="state">The call state to evaluate.</param>
+        /// <returns><see langword="true"/> when the state represents an active or pending call; otherwise, <see langword="false"/>.</returns>
         public static bool IsBusy(CallState state)
         {
             switch (state)

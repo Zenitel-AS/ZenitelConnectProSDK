@@ -2,6 +2,9 @@
 
 namespace ConnectPro.Models.AccessControl
 {
+    /// <summary>
+    /// Represents the outcome and metadata of an open-door request or event.
+    /// </summary>
     public class OpenDoorEventData
     {
         /// <summary>
@@ -46,6 +49,7 @@ namespace ConnectPro.Models.AccessControl
         /// <summary>
         /// Sets the last event timestamp for rate-limiting, but only once.
         /// </summary>
+        /// <returns><see langword="true"/> when the timestamp was set for the first time; otherwise, <see langword="false"/>.</returns>
         public bool TrySetLastEventTimestamp()
         {
             if (LastEventTimestamp == 0) // If not set

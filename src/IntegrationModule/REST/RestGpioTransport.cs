@@ -54,6 +54,10 @@ public sealed class RestGpioTransport : IGpioTransport
         public List<GpioResponse> Gpis { get; set; }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RestGpioTransport"/> class.
+    /// </summary>
+    /// <param name="core">The core instance that provides access to the authenticated REST client.</param>
     public RestGpioTransport(Core core)
     {
         _core = core ?? throw new ArgumentNullException(nameof(core));

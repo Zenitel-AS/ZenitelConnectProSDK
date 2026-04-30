@@ -301,6 +301,10 @@ namespace ConnectPro.Debug
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases event subscriptions and cached lookup state used by the log component.
+        /// </summary>
+        /// <param name="disposing"><see langword="true"/> to release managed resources; otherwise, <see langword="false"/>.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)

@@ -14,8 +14,14 @@ namespace Wamp.Client
         private TracerOpenDoorEvent tracerOpenDoorEvent;
         private IAsyncDisposable tracerOpenDoorEventDisposable;
 
+        /// <summary>
+        /// Occurs when an open-door event is published by the WAMP backend.
+        /// </summary>
         public event EventHandler<wamp_open_door_event> OnWampOpenDoorEvent;
 
+        /// <summary>
+        /// Subscribes to open-door notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceOpenDoorEvent()
         {
             try
@@ -72,6 +78,9 @@ namespace Wamp.Client
             OnWampOpenDoorEvent?.Invoke(this, openDoorEvent);
         }
 
+        /// <summary>
+        /// Disposes the open-door subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceOpenDoorEventDispose()
         {
             TracerOpenDoorEvent tracer = null;
@@ -105,6 +114,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the open-door subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceOpenDoorEventIsEnabled()
         {
             lock (_traceOpenDoorEventGate)

@@ -320,6 +320,10 @@ namespace ConnectPro.Models
 
         #region DTO Conversion
 
+        /// <summary>
+        /// Converts this device instance to a serializable DTO representation.
+        /// </summary>
+        /// <returns>A DTO containing the persisted device properties.</returns>
         public DeviceDto ToDto()
         {
             return new DeviceDto
@@ -338,6 +342,11 @@ namespace ConnectPro.Models
             };
         }
 
+        /// <summary>
+        /// Creates a device instance from a DTO.
+        /// </summary>
+        /// <param name="dto">The DTO containing persisted device data.</param>
+        /// <returns>A new <see cref="Device"/> instance, or <see langword="null"/> when <paramref name="dto"/> is <see langword="null"/>.</returns>
         public static Device FromDto(DeviceDto dto)
         {
             if (dto == null) return null;

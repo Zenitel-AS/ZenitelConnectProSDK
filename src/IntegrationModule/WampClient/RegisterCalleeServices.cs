@@ -8,6 +8,10 @@ namespace Wamp.Client
         private readonly object _calleeRegistrationGate = new object();
         private IAsyncDisposable _calleeRegistrationDisposable;
 
+        /// <summary>
+        /// Registers the SDK's callee services against the active WAMP realm so server-side calls can be handled.
+        /// </summary>
+        /// <returns>A task that represents the asynchronous registration operation.</returns>
         public async Task RegisterCalleeServices()
         {
             try

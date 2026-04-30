@@ -8,6 +8,9 @@ namespace Wamp.Client
         private bool _disposed;
         private readonly object _disposeLock = new object();
 
+        /// <summary>
+        /// Releases WAMP subscriptions, timers, connection resources, and other managed state owned by the client.
+        /// </summary>
         public void Dispose()
         {
             lock (_disposeLock)

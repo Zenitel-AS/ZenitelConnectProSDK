@@ -14,8 +14,14 @@ namespace Wamp.Client
         private TracerCallEvent tracerCallEvent;
         private IAsyncDisposable tracerCallEventsDisposable;
 
+        /// <summary>
+        /// Occurs when the status of a call changes on the WAMP event stream.
+        /// </summary>
         public event EventHandler<wamp_call_element> OnWampCallStatusEvent;
 
+        /// <summary>
+        /// Subscribes to call status notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceCallEvent()
         {
             try
@@ -72,6 +78,9 @@ namespace Wamp.Client
             OnWampCallStatusEvent?.Invoke(this, callUpd);
         }
 
+        /// <summary>
+        /// Disposes the call status subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceCallEventDispose()
         {
             TracerCallEvent tracer = null;
@@ -105,6 +114,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the call status subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceCallEventIsEnabled()
         {
             lock (_traceCallEventGate)

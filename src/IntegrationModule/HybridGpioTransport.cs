@@ -80,9 +80,9 @@ public sealed class HybridGpioTransport : IGpioTransport, IDisposable
     }
 
     /// <summary>
-    /// 
+    /// Removes any callback registrations for the specified device from the underlying transports.
     /// </summary>
-    /// <param name="dirno"></param>
+    /// <param name="dirno">The directory number that identifies the target device.</param>
     public void DisposeFor(string dirno)
     {
         if (_disposed)
@@ -92,6 +92,9 @@ public sealed class HybridGpioTransport : IGpioTransport, IDisposable
         _rest.DisposeFor(dirno);
     }
 
+    /// <summary>
+    /// Disposes the WAMP transport owned by this composite transport and prevents further use.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)

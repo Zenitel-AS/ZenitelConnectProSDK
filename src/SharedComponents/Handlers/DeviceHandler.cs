@@ -63,6 +63,7 @@ namespace ConnectPro.Handlers
         /// <param name="collections">Reference to the collections object managing registered devices.</param>
         /// <param name="events">Reference to the events object handling device-related events.</param>
         /// <param name="wamp">Reference to the WAMP client for communication.</param>
+        /// <param name="gpioTransport">The transport used for GPIO snapshots, commands, and realtime updates.</param>
         /// <param name="parentIpAddress">Optional parent device IP address.</param>
         public DeviceHandler(ref Collections collections,
                              ref Events events,
@@ -231,25 +232,48 @@ namespace ConnectPro.Handlers
         {
             try
             {
-                var device = _collections.RegisteredDevices.First(d => d.dirno == wampGpioEvent.Dirno);
+                if (wampGpioEvent == null)
+                    throw new ArgumentNullException(nameof(wampGpioEvent));
+
+                if (wampGpioEvent.Element == null)
+                    throw new Exception("HandleDeviceGPIOStatusEvent exception: GPIO element is null");
+
+                var device = _collections.RegisteredDevices
+                    .FirstOrDefault(d => d.dirno == wampGpioEvent.Dirno);
+
                 if (device == null)
-                    throw new Exception($"HandleDeviceGPIOStatusEvent exception: No device found for dirno {wampGpioEvent.Dirno}");
+                    throw new Exception(
+                        $"HandleDeviceGPIOStatusEvent exception: No device found for dirno {wampGpioEvent.Dirno}");
 
-                var gpio = device.Gpio.Inputs.FirstOrDefault(input => input.Id == wampGpioEvent.Element.id);
+                var gpio = device.Gpio.Inputs
+                    .Concat(device.Gpio.Outputs)
+                    .FirstOrDefault(x => x.Id == wampGpioEvent.Element.id);
+
                 if (gpio == null)
-                    gpio = device.Gpio.Outputs.FirstOrDefault(output => output.Id == wampGpioEvent.Element.id);
+                    throw new Exception(
+                        $"HandleDeviceGPIOStatusEvent exception: No GPIO found for dirno {wampGpioEvent.Dirno}, gpio {wampGpioEvent.Element.id}");
 
-                if (gpio != null)
+                switch ((wampGpioEvent.Element.state ?? string.Empty).Trim().ToUpperInvariant())
                 {
-                    // Invoke GPIO Event here
-                    _events.OnGpioEvent?.Invoke(this, wampGpioEvent);
-                }
-            }
-            catch (Exception Ex)
-            {
-                _events.OnExceptionThrown?.Invoke(this, Ex);
-            }
+                    case "HIGH":
+                        gpio.State = Enums.GpioState.Active;
+                        break;
 
+                    case "LOW":
+                        gpio.State = Enums.GpioState.Inactive;
+                        break;
+
+                    default:
+                        gpio.State = Enums.GpioState.Unknown;
+                        break;
+                }
+
+                _events.OnGpioEvent?.Invoke(this, wampGpioEvent);
+            }
+            catch (Exception ex)
+            {
+                _events.OnExceptionThrown?.Invoke(this, ex);
+            }
         }
 
         #endregion
@@ -457,6 +481,13 @@ namespace ConnectPro.Handlers
 
         #region Device Control Methods
 
+        /// <summary>
+        /// Simulates a key press on the specified device.
+        /// </summary>
+        /// <param name="dirno">The directory number of the target device.</param>
+        /// <param name="key">The key identifier to simulate.</param>
+        /// <param name="edge">The key edge or action to send to the device.</param>
+        /// <returns><see langword="true"/> when the key press request succeeds; otherwise, <see langword="false"/>.</returns>
         public bool SimulateKeyPress(string dirno, string key, string edge)
         {
             wamp_response response = _wamp.PostDeviceIdKey(dirno, key, edge);
@@ -466,6 +497,12 @@ namespace ConnectPro.Handlers
             return false;
         }
 
+        /// <summary>
+        /// Starts a tone test for the specified device.
+        /// </summary>
+        /// <param name="dirno">The directory number of the target device.</param>
+        /// <param name="toneGroup">The tone group to use for the test.</param>
+        /// <returns><see langword="true"/> when the tone test request succeeds; otherwise, <see langword="false"/>.</returns>
         public bool InitiateToneTest(string dirno, string toneGroup)
         {
             wamp_response response = _wamp.ToneTest(dirno, toneGroup);
@@ -581,12 +618,19 @@ namespace ConnectPro.Handlers
 
         private bool _disposed = false;
 
+        /// <summary>
+        /// Releases device handler resources, including timers, event subscriptions, and GPIO transport state.
+        /// </summary>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Releases the resources used by the device handler.
+        /// </summary>
+        /// <param name="disposing"><see langword="true"/> to release managed resources; otherwise, <see langword="false"/>.</param>
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)

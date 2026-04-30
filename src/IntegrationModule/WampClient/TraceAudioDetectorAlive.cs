@@ -14,8 +14,14 @@ namespace Wamp.Client
         private TracerAudioDetectorAlive tracerAudioDetectorAlive;
         private IAsyncDisposable tracerAudioDetectorAlivesDisposable;
 
+        /// <summary>
+        /// Occurs when the audio detector publishes a heartbeat indicating that it is alive.
+        /// </summary>
         public event EventHandler<wamp_audio_detector_alive> OnAudioDetectorAlive;
 
+        /// <summary>
+        /// Subscribes to audio detector alive notifications from the active WAMP realm.
+        /// </summary>
         public async void TraceAudioDetectorAlive()
         {
             try
@@ -72,6 +78,9 @@ namespace Wamp.Client
             OnAudioDetectorAlive?.Invoke(this, audioEvent);
         }
 
+        /// <summary>
+        /// Disposes the audio detector alive subscription and detaches the internal tracer handlers.
+        /// </summary>
         public void TraceAudioDetectorAliveDispose()
         {
             TracerAudioDetectorAlive tracer = null;
@@ -105,6 +114,10 @@ namespace Wamp.Client
             }
         }
 
+        /// <summary>
+        /// Determines whether the audio detector alive subscription is currently active.
+        /// </summary>
+        /// <returns><see langword="true"/> when the subscription is active; otherwise, <see langword="false"/>.</returns>
         public bool TraceAudioDetectorAliveIsEnabled()
         {
             lock (_traceAudioDetectorAliveGate)
