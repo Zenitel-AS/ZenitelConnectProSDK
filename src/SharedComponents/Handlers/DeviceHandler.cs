@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Wamp.Client;
 using static Wamp.Client.WampClient;
 using Timer = System.Timers.Timer;
@@ -251,9 +252,12 @@ namespace ConnectPro.Handlers
 
                 var direction = ResolveDirection(sender, wampGpioEvent.Element);
                 var state = ParseGpioState(wampGpioEvent.Element);
+
                 var rawState = !string.IsNullOrWhiteSpace(wampGpioEvent.Element.state)
-                    ? wampGpioEvent.Element.state
-                    : wampGpioEvent.Element.operation;
+                    ? $"{{id: {wampGpioEvent.Element.id}, state: {wampGpioEvent.Element.state}}}"
+                    : !string.IsNullOrWhiteSpace(wampGpioEvent.Element.operation)
+                        ? $"{{id: {wampGpioEvent.Element.id}, operation: {wampGpioEvent.Element.operation}}}"
+                        : null;
 
                 device.Gpio.Upsert(new GpioPoint(
                     wampGpioEvent.Element.id,

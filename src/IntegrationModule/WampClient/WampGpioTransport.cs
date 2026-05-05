@@ -4,6 +4,7 @@ using SharedComponents.Models.GPIO;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Wamp.Client;
@@ -162,12 +163,18 @@ public sealed class WampGpioTransport : IGpioTransport, IDisposable
         if (!_callbacks.TryGetValue(dirno, out cb))
             return;
 
+        var rawState = !string.IsNullOrWhiteSpace(element.state)
+            ? $"{{id: {element.id}, state: {element.state}}}"
+            : !string.IsNullOrWhiteSpace(element.operation)
+                ? $"{{id: {element.id}, operation: {element.operation}}}"
+                : null;
+
         var point = new GpioPoint(
             element.id,
             direction,
             ParseState(element),
             DateTimeOffset.UtcNow,
-            element.ToString());
+            rawState ?? string.Empty);
 
         cb(point);
     }
