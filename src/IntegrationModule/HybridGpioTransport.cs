@@ -1,5 +1,7 @@
 using ConnectPro;
 using ConnectPro.Models;
+using ConnectPro.Models.Responses;
+using Newtonsoft.Json;
 using SharedComponents.Models.GPIO;
 using System;
 using System.Collections.Generic;
@@ -54,20 +56,29 @@ public sealed class HybridGpioTransport : IGpioTransport, IDisposable
     /// <param name="timeSeconds">The optional duration in seconds for the GPO state, or null for indefinite duration.</param>
     /// <param name="ct">The cancellation token to observe.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    public Task SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
+    public async Task<ObjectResponse> SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
     {
         ThrowIfDisposed();
 
         try
         {
-            return _wamp.SetGpoAsync(dirno, gpoId, active, timeSeconds, ct);
+            ObjectResponse wampResult =
+                await _wamp.SetGpoAsync(dirno, gpoId, active, timeSeconds, ct).ConfigureAwait(false);
+
+            if (wampResult != null && wampResult.Success)
+                return wampResult;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
-            return _rest.SetGpoAsync(dirno, gpoId, active, timeSeconds, ct);
         }
+
+        return await _rest.SetGpoAsync(dirno, gpoId, active, timeSeconds, ct).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// Ensures that the specified directory is subscribed to GPIO point updates.
     /// </summary>

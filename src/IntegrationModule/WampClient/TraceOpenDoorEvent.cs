@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
 using WampSharp.V2.Core.Contracts;
@@ -24,6 +25,11 @@ namespace Wamp.Client
         /// </summary>
         public async void TraceOpenDoorEvent()
         {
+            await TraceOpenDoorEventAsync().ConfigureAwait(false);
+        }
+
+        internal async Task TraceOpenDoorEventAsync()
+        {
             try
             {
                 lock (_traceOpenDoorEventGate)
@@ -37,6 +43,9 @@ namespace Wamp.Client
                     OnChildLogString?.Invoke(this, "TraceOpenDoorEvent skipped. WAMP realm proxy is not available.");
                     return;
                 }
+
+                OnChildLogString?.Invoke(this,
+                    "TraceOpenDoorEvent starting subscription on current realm. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
 
                 IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampSystemOpenDoor);
 
@@ -60,6 +69,9 @@ namespace Wamp.Client
 
                     tracerOpenDoorEvent = tracer;
                     tracerOpenDoorEventDisposable = subscription;
+
+                    OnChildLogString?.Invoke(this,
+                        "TraceOpenDoorEvent subscription established. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
                 }
             }
             catch (Exception ex)

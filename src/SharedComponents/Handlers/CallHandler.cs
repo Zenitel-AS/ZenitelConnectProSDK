@@ -266,8 +266,6 @@ namespace ConnectPro.Handlers
                         _events.OnDeviceStateChange?.Invoke(this, callElement);
                         break;
                 }
-
-                UpdateGroupBusyFromCall(callElement);
             }
         }
 
@@ -714,7 +712,7 @@ namespace ConnectPro.Handlers
 
                                 if (_collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault() != null)
                                 {
-                                    _collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault().OnBussyStateChange?.Invoke(this, IsBusy(call.CallState));
+                                    _collections.Groups.Where(x => x.Dirno == call.ToDirnoCurrent).FirstOrDefault().OnBussyStateChange?.Invoke(this, CallStateMapper.IsBusy(call.CallState));
                                 }
                             }
                             catch (Exception exe)
@@ -1232,53 +1230,5 @@ namespace ConnectPro.Handlers
 
         #endregion
 
-        #region Helpers
-
-        private void UpdateGroupBusyFromCall(CallElement callElement)
-        {
-            // Candidate dirnos that may represent a group in this call
-            var candidates = new[] { callElement.ToDirnoCurrent, callElement.ToDirno, callElement.FromDirno };
-
-            foreach (var dirno in candidates)
-            {
-                if (string.IsNullOrWhiteSpace(dirno))
-                    continue;
-
-                var group = _collections?.Groups?.FirstOrDefault(g => g.Dirno == dirno);
-                if (group == null)
-                    continue;
-
-                group.OnBussyStateChange?.Invoke(this, IsBusy(callElement.CallState));
-            }
-        }
-
-
-        /// <summary>
-        /// Determines whether the specified call state should be treated as a busy state.
-        /// </summary>
-        /// <param name="state">The call state to evaluate.</param>
-        /// <returns><see langword="true"/> when the state represents an active or pending call; otherwise, <see langword="false"/>.</returns>
-        public static bool IsBusy(CallState state)
-        {
-            switch (state)
-            {
-                case CallState.init:
-                case CallState.forwarding:
-                case CallState.queued:
-                case CallState.ringing:
-                case CallState.in_call:
-                    return true;
-
-                case CallState.reachable:
-                case CallState.ended:
-                case CallState.fault:
-                    return false;
-
-                default:
-                    return false;
-            }
-        }
-
-        #endregion
     }
 }

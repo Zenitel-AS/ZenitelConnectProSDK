@@ -39,6 +39,7 @@
 
       <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
         <TextBlock Text="{Binding LogEntries.Count}" Opacity="0.75" VerticalAlignment="Center"/>
+        <Button Content="Copy Log" Click="CopyLog_Click"/>
         <Button Content="Clear" Command="{Binding ClearCommand}"/>
       </StackPanel>
 

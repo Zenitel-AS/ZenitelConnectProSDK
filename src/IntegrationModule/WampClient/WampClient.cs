@@ -6,8 +6,10 @@ using System.Net;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using WampSharp.Core.Listener;
 using WampSharp.V2;
 using WampSharp.V2.Client;
@@ -205,8 +207,12 @@ namespace Wamp.Client
 
         private Timer _reconnectTimer;
         private readonly object _connectionGate = new object();
+        private readonly SemaphoreSlim _channelTransitionGate = new SemaphoreSlim(1, 1);
         private bool _isStopping;
         private bool _certificateCallbackRegistered;
+        private long _channelGeneration;
+        private long _activeChannelGeneration;
+        private ConnectionLifecycleState _connectionLifecycleState;
 
 
         /// <summary>Zenitel Connect Server IP Address.</summary>
@@ -243,6 +249,24 @@ namespace Wamp.Client
 
         // WAMP realm proxy - created 
         IWampRealmProxy _wampRealmProxy;
+
+        private enum ConnectionLifecycleState
+        {
+            Disconnected,
+            Connecting,
+            Connected,
+            Reconnecting,
+            Stopping
+        }
+
+        private sealed class ChannelContext
+        {
+            public long Generation { get; set; }
+
+            public IWampChannel Channel { get; set; }
+
+            public IWampRealmProxy RealmProxy { get; set; }
+        }
 
 
         /// <summary>WAMP connection established and session open for use.</summary>
@@ -291,11 +315,15 @@ namespace Wamp.Client
         public void Start()
         /***********************************************************************************************************************/
         {
+            LogLifecycleAction("WampConnection.Start() requested");
+
             lock (_connectionGate)
             {
                 if (_isStopping)
                     return;
             }
+
+            SetConnectionLifecycleState(ConnectionLifecycleState.Reconnecting, false);
 
             OnChildLogString?.Invoke(this, "WampConnection.Start().");
             StartReconnect();
@@ -325,9 +353,12 @@ namespace Wamp.Client
         public void Stop()
         /***********************************************************************************************************************/
         {
+            LogLifecycleAction("WampConnection.Stop() requested");
+
             lock (_connectionGate)
             {
                 _isStopping = true;
+                _connectionLifecycleState = ConnectionLifecycleState.Stopping;
             }
 
             StopReconnect();
@@ -339,6 +370,7 @@ namespace Wamp.Client
             {
                 IsConnected = false;
                 RenewAccessTokenRequested = false;
+                _connectionLifecycleState = ConnectionLifecycleState.Disconnected;
                 _isStopping = false;
             }
         }
@@ -360,6 +392,38 @@ namespace Wamp.Client
             return true;
         }
 
+        /***********************************************************************************************************************/
+        private void StartRenewAccessTokenTimer()
+        /***********************************************************************************************************************/
+        {
+            if (RenewAccessTokenTimer != null)
+            {
+                try
+                {
+                    RenewAccessTokenTimer.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    OnChildLogString?.Invoke(this, "Exception disposing existing RenewAccessTokenTimer: " + ex);
+                }
+                finally
+                {
+                    RenewAccessTokenTimer = null;
+                }
+            }
+
+            // ZCP access token timeout is 30 minutes.
+            // Renew slightly before expiry.
+            const int minutes_29 = 29 * 60 * 1000;
+
+            RenewAccessTokenTimer = new Timer(
+                RenewAccessTokenTimer_Tick,
+                null,
+                minutes_29,
+                minutes_29);
+
+            OnChildLogString?.Invoke(this, "RenewAccessTokenTimer started.");
+        }
         /***********************************************************************************************************************/
         private void StopRenewAccessTokenTimer()
         /***********************************************************************************************************************/
@@ -400,6 +464,8 @@ namespace Wamp.Client
         private void StartReconnect()
         /***********************************************************************************************************************/
         {
+            LogLifecycleAction("StartReconnect invoked");
+
             if (_reconnectTimer == null)
             {
                 _reconnectTimer = new Timer((object s) =>
@@ -411,6 +477,8 @@ namespace Wamp.Client
                             if (_isStopping)
                                 return;
                         }
+
+                        OnChildLogString?.Invoke(this, "Reconnect timer tick. " + GetConnectionDebugState());
 
                         bool useEncryption = WampPort.Equals(WampEncryptedPort);
 
@@ -501,6 +569,8 @@ namespace Wamp.Client
         {
             try
             {
+                LogLifecycleAction("RequestNewAcessToken invoked");
+
                 lock (_connectionGate)
                 {
                     if (_isStopping)
@@ -596,36 +666,171 @@ namespace Wamp.Client
             }
         }
 
+        /***********************************************************************************************************************/
+        private void SetConnectionLifecycleState(ConnectionLifecycleState state, bool isConnected)
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                _connectionLifecycleState = state;
+                IsConnected = isConnected;
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private void SetConnectionLifecycleState(long generation, ConnectionLifecycleState state, bool isConnected)
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                if (generation != 0 && generation != _activeChannelGeneration)
+                {
+                    return;
+                }
+
+                _connectionLifecycleState = state;
+                IsConnected = isConnected;
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private long ReserveChannelGeneration()
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                return ++_channelGeneration;
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private bool TryGetActiveRealmProxy(out IWampRealmProxy realmProxy, out long generation)
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                generation = _activeChannelGeneration;
+                realmProxy = _wampRealmProxy;
+
+                return realmProxy != null &&
+                       IsConnected &&
+                       _connectionLifecycleState == ConnectionLifecycleState.Connected;
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private ChannelContext CaptureActiveChannelContext()
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                if (_wampChannel == null && _wampRealmProxy == null)
+                {
+                    return null;
+                }
+
+                return new ChannelContext
+                {
+                    Generation = _activeChannelGeneration,
+                    Channel = _wampChannel,
+                    RealmProxy = _wampRealmProxy
+                };
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private bool IsCurrentGeneration(long generation)
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                return generation != 0 && generation == _activeChannelGeneration;
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private bool IsStoppingRequested()
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                return _isStopping;
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private string GetConnectionDebugState()
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                return $"State={_connectionLifecycleState}, IsConnected={IsConnected}, ActiveGeneration={_activeChannelGeneration}, HasChannel={_wampChannel != null}, HasRealmProxy={_wampRealmProxy != null}, RenewRequested={RenewAccessTokenRequested}, IsStopping={_isStopping}";
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private string GetConnectionDebugStateForRealm(IWampRealmProxy realmProxy)
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                var matchesActiveRealm = realmProxy != null && ReferenceEquals(realmProxy, _wampRealmProxy);
+
+                return $"State={_connectionLifecycleState}, IsConnected={IsConnected}, ActiveGeneration={_activeChannelGeneration}, HasChannel={_wampChannel != null}, HasRealmProxy={_wampRealmProxy != null}, MatchesActiveRealm={matchesActiveRealm}, RenewRequested={RenewAccessTokenRequested}, IsStopping={_isStopping}";
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private void LogLifecycleAction(string action, [CallerMemberName] string caller = null)
+        /***********************************************************************************************************************/
+        {
+            OnChildLogString?.Invoke(this, $"{action}. Caller={caller}. {GetConnectionDebugState()}");
+        }
+
 
         /***********************************************************************************************************************/
         private void ResetChannel()
         /***********************************************************************************************************************/
         {
-            DetachMonitorEvents();
+            OnChildLogString?.Invoke(this, "ResetChannel BEGIN. " + GetConnectionDebugState());
 
-            if (_wampChannel != null)
+            _channelTransitionGate.Wait();
+
+            try
             {
-                try
-                {
-                    _wampChannel.Close();
-                }
-                catch (Exception ex)
-                {
-                    OnChildLogString?.Invoke(this, "Exception in ResetChannel(): " + ex.ToString());
-                }
-                finally
+                var channelContext = CaptureActiveChannelContext();
+
+                OnChildLogString?.Invoke(this,
+                    $"ResetChannel captured context Generation={channelContext?.Generation ?? 0}, HasChannel={channelContext?.Channel != null}, HasRealmProxy={channelContext?.RealmProxy != null}.");
+
+                lock (_connectionGate)
                 {
                     _wampChannel = null;
+                    _wampRealmProxy = null;
+                    _activeChannelGeneration = 0;
+                    _connectionLifecycleState = _isStopping
+                        ? ConnectionLifecycleState.Stopping
+                        : ConnectionLifecycleState.Disconnected;
+                    IsConnected = false;
                 }
-            }
 
-            _wampRealmProxy = null;
+                DisposeChannelContext(channelContext, "ResetChannel");
+
+                OnChildLogString?.Invoke(this, "ResetChannel END. " + GetConnectionDebugState());
+            }
+            finally
+            {
+                _channelTransitionGate.Release();
+            }
         }
 
         /***********************************************************************************************************************/
         private void SetConnectState(bool connected, string error, string token = null)
         /***********************************************************************************************************************/
         {
+            OnChildLogString?.Invoke(this,
+                $"SetConnectState invoked. Connected={connected}, Error='{error ?? "<null>"}', HasToken={!string.IsNullOrEmpty(token)}. {GetConnectionDebugState()}");
+
             lock (_connectionGate)
             {
                 if (_isStopping)
@@ -635,8 +840,11 @@ namespace Wamp.Client
             if (connected)
             {
                 OnChildLogString?.Invoke(this, "WampConnection.SetConnectState. Connected: True.");
+                OnChildLogString?.Invoke(this, "SetConnectState(TRUE) before transition. " + GetConnectionDebugState());
 
                 StopReconnect();
+
+                SetConnectionLifecycleState(ConnectionLifecycleState.Connecting, false);
 
                 _wampAuthenticator = new TicketAuthenticator(UserName, token);
 
@@ -645,10 +853,13 @@ namespace Wamp.Client
             else
             {
                 OnChildLogString?.Invoke(this, "WampConnection.SetConnectState. Connected: False. Error: " + error);
+                OnChildLogString?.Invoke(this, "SetConnectState(FALSE) before reset. " + GetConnectionDebugState());
 
                 OnError?.Invoke(this, error);
 
                 StopRenewAccessTokenTimer();
+
+                SetConnectionLifecycleState(ConnectionLifecycleState.Disconnected, false);
 
                 ResetChannel();
                 Start();
@@ -660,21 +871,99 @@ namespace Wamp.Client
         private void OpenChannel()
         /***********************************************************************************************************************/
         {
-            ResetChannel();
+            OnChildLogString?.Invoke(this, "OpenChannel BEGIN. " + GetConnectionDebugState());
 
+            _channelTransitionGate.Wait();
+
+            ChannelContext previousChannelContext = null;
+            ChannelContext newChannelContext = null;
+
+            try
+            {
+                var generation = ReserveChannelGeneration();
+                OnChildLogString?.Invoke(this, $"OpenChannel reserved Generation={generation}. {GetConnectionDebugState()}");
+
+                newChannelContext = BuildChannelContext(generation);
+                AttachMonitorEvents(newChannelContext);
+
+                OnChildLogString?.Invoke(this,
+                    $"OpenChannel built channel Generation={generation}, HasChannel={newChannelContext.Channel != null}, HasRealmProxy={newChannelContext.RealmProxy != null}.");
+
+                lock (_connectionGate)
+                {
+                    previousChannelContext = new ChannelContext
+                    {
+                        Generation = _activeChannelGeneration,
+                        Channel = _wampChannel,
+                        RealmProxy = _wampRealmProxy
+                    };
+
+                    _wampChannel = newChannelContext.Channel;
+                    _wampRealmProxy = newChannelContext.RealmProxy;
+                    _activeChannelGeneration = newChannelContext.Generation;
+                    _connectionLifecycleState = ConnectionLifecycleState.Connecting;
+                    IsConnected = false;
+                }
+
+                OnChildLogString?.Invoke(this,
+                    $"OpenChannel published Generation={newChannelContext.Generation}. PreviousGeneration={previousChannelContext?.Generation ?? 0}. {GetConnectionDebugState()}");
+
+                newChannelContext.Channel.Open().Wait();
+
+                OnChildLogString?.Invoke(this,
+                    $"OpenChannel OPEN completed Generation={newChannelContext.Generation}. {GetConnectionDebugState()}");
+
+                DisposeChannelContext(previousChannelContext, "OpenChannel previous channel swap");
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this, "Exception in OpenChannel(): " + ex.ToString());
+
+                if (newChannelContext != null)
+                {
+                    lock (_connectionGate)
+                    {
+                        if (_activeChannelGeneration == newChannelContext.Generation)
+                        {
+                            _wampChannel = previousChannelContext?.Channel;
+                            _wampRealmProxy = previousChannelContext?.RealmProxy;
+                            _activeChannelGeneration = previousChannelContext?.Generation ?? 0;
+                            _connectionLifecycleState = previousChannelContext != null && previousChannelContext.Channel != null
+                                ? ConnectionLifecycleState.Reconnecting
+                                : ConnectionLifecycleState.Disconnected;
+                            IsConnected = false;
+                        }
+                    }
+
+                    DisposeChannelContext(newChannelContext, "OpenChannel failed new channel");
+                }
+
+                OnChildLogString?.Invoke(this, "OpenChannel FAILURE state. " + GetConnectionDebugState());
+            }
+            finally
+            {
+                _channelTransitionGate.Release();
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private ChannelContext BuildChannelContext(long generation)
+        /***********************************************************************************************************************/
+        {
             IWampChannelFactory factory = new WampChannelFactory();
+            IWampChannel channel;
+
+            OnChildLogString?.Invoke(this,
+                $"BuildChannelContext Generation={generation}, Transport={(WampPort.Equals(WampEncryptedPort) ? "WebSocket4NetTransport" : "RawSocketTransport")}, Url={WampUrl}, Realm={WampRealm}.");
 
             if (WampPort.Equals(WampEncryptedPort))
             {
-                // create connect to realm, transport, serialization and authenticator
                 var stx = factory
                     .ConnectToRealm(WampRealm)
                     .WebSocket4NetTransport(WampUrl)
-
                     .SetSecurityOptions(o =>
                     {
                         #if NET48
-                        // .NET Framework 4.8: Include Tls13 and older protocols
                         o.EnabledSslProtocols = SslProtocols.Tls13 |
                                                  SslProtocols.Tls12 |
                                                  SslProtocols.Tls11 |
@@ -682,7 +971,6 @@ namespace Wamp.Client
                                                  SslProtocols.Ssl3 |
                                                  SslProtocols.Ssl2;
                         #else
-                        // Other frameworks: Exclude Tls13, fallback to older protocols
                         o.EnabledSslProtocols = SslProtocols.Tls12 |
                                                  SslProtocols.Tls11 |
                                                  SslProtocols.Tls |
@@ -690,44 +978,171 @@ namespace Wamp.Client
                                                  SslProtocols.Ssl2;
                         #endif
 
-                        // Allow certificate chain errors
                         o.AllowCertificateChainErrors = true;
                         o.AllowNameMismatchCertificate = true;
                         o.AllowUnstrustedCertificate = true;
                     })
-
-
                     .JsonSerialization()
                     .Authenticator(_wampAuthenticator);
 
-                // build channel
-                _wampChannel = stx.Build();
+                channel = stx.Build();
             }
             else
             {
-                //Build raw data connection
-                var stx =
-                factory.ConnectToRealm(WampRealm)
-                       .RawSocketTransport(WampServerAddr, int.Parse(WampPort))
-                       .JsonSerialization()
-                       .Authenticator(_wampAuthenticator);
-                _wampChannel = stx.Build();
+                var stx = factory
+                    .ConnectToRealm(WampRealm)
+                    .RawSocketTransport(WampServerAddr, int.Parse(WampPort))
+                    .JsonSerialization()
+                    .Authenticator(_wampAuthenticator);
+
+                channel = stx.Build();
             }
 
-            // attach handlers to monitor
-            _wampRealmProxy = _wampChannel.RealmProxy;
-            _wampRealmProxy.Monitor.ConnectionEstablished += Monitor_ConnectionEstablished;
-            _wampRealmProxy.Monitor.ConnectionError += Monitor_ConnectionError;
-            _wampRealmProxy.Monitor.ConnectionBroken += Monitor_ConnectionBroken;
+            return new ChannelContext
+            {
+                Generation = generation,
+                Channel = channel,
+                RealmProxy = channel.RealmProxy
+            };
+        }
+
+        /***********************************************************************************************************************/
+        private void AttachMonitorEvents(ChannelContext channelContext)
+        /***********************************************************************************************************************/
+        {
+            if (channelContext?.RealmProxy?.Monitor == null)
+            {
+                return;
+            }
+
+            channelContext.RealmProxy.Monitor.ConnectionEstablished += Monitor_ConnectionEstablished;
+            channelContext.RealmProxy.Monitor.ConnectionError += Monitor_ConnectionError;
+            channelContext.RealmProxy.Monitor.ConnectionBroken += Monitor_ConnectionBroken;
+        }
+
+        /***********************************************************************************************************************/
+        private void DetachMonitorEvents(ChannelContext channelContext)
+        /***********************************************************************************************************************/
+        {
+            if (channelContext?.RealmProxy?.Monitor == null)
+            {
+                return;
+            }
+
+            channelContext.RealmProxy.Monitor.ConnectionEstablished -= Monitor_ConnectionEstablished;
+            channelContext.RealmProxy.Monitor.ConnectionError -= Monitor_ConnectionError;
+            channelContext.RealmProxy.Monitor.ConnectionBroken -= Monitor_ConnectionBroken;
+        }
+
+        /***********************************************************************************************************************/
+        private void DisposeChannelContext(ChannelContext channelContext, string source)
+        /***********************************************************************************************************************/
+        {
+            if (channelContext == null)
+            {
+                return;
+            }
+
+            DetachMonitorEvents(channelContext);
+
+            if (channelContext.Channel == null)
+            {
+                return;
+            }
 
             try
             {
-                _wampChannel.Open().Wait();
+                OnChildLogString?.Invoke(this,
+                    $"DisposeChannelContext Source={source}, Generation={channelContext.Generation}, HasChannel={channelContext.Channel != null}, HasRealmProxy={channelContext.RealmProxy != null}.");
+
+                channelContext.Channel.Close();
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in OpenChannel(): " + ex.ToString());
+                OnChildLogString?.Invoke(this, $"Exception disposing channel in {source}: {ex}");
             }
+        }
+
+        /***********************************************************************************************************************/
+        private bool TryGetActiveGenerationForMonitor(object sender, out long generation)
+        /***********************************************************************************************************************/
+        {
+            lock (_connectionGate)
+            {
+                generation = _activeChannelGeneration;
+
+                return generation != 0 &&
+                       _wampRealmProxy?.Monitor != null &&
+                       ReferenceEquals(sender, _wampRealmProxy.Monitor);
+            }
+        }
+
+        /***********************************************************************************************************************/
+        private bool TryGetActiveServices(out IWampRealmProxy realmProxy, out IConnectWampServices serviceProxy, out long generation, string operationName)
+        /***********************************************************************************************************************/
+        {
+            serviceProxy = null;
+
+            if (!TryGetActiveRealmProxy(out realmProxy, out generation))
+            {
+                OnChildLogString?.Invoke(this, operationName + ": not connected. " + GetConnectionDebugState());
+                return false;
+            }
+
+            var services = realmProxy.Services;
+            if (services == null)
+            {
+                OnChildLogString?.Invoke(this, operationName + $": realm proxy services not ready. Generation={generation}. " + GetConnectionDebugState());
+                return false;
+            }
+
+            serviceProxy = services.GetCalleeProxy<IConnectWampServices>();
+            if (serviceProxy == null)
+            {
+                OnChildLogString?.Invoke(this, operationName + $": callee proxy unavailable. Generation={generation}. " + GetConnectionDebugState());
+                return false;
+            }
+
+            OnChildLogString?.Invoke(this,
+                operationName + $": active service proxy acquired. Generation={generation}, ServicesHash={services.GetHashCode()}, ServiceProxyHash={serviceProxy.GetHashCode()}. " + GetConnectionDebugState());
+
+            return true;
+        }
+
+        /***********************************************************************************************************************/
+        private bool TryGetActiveRpcCatalog(out IWampRealmProxy realmProxy, out long generation, string operationName)
+        /***********************************************************************************************************************/
+        {
+            if (!TryGetActiveRealmProxy(out realmProxy, out generation))
+            {
+                OnChildLogString?.Invoke(this, operationName + ": not connected. " + GetConnectionDebugState());
+                return false;
+            }
+
+            if (realmProxy.RpcCatalog == null)
+            {
+                OnChildLogString?.Invoke(this, operationName + $": RPC catalog not ready. Generation={generation}. " + GetConnectionDebugState());
+                return false;
+            }
+
+            OnChildLogString?.Invoke(this,
+                operationName + $": active RPC catalog acquired. Generation={generation}, RpcCatalogHash={realmProxy.RpcCatalog.GetHashCode()}. " + GetConnectionDebugState());
+
+            return true;
+        }
+
+        /***********************************************************************************************************************/
+        private void HandleExpectedRpcFailure(string operationName, Exception ex)
+        /***********************************************************************************************************************/
+        {
+            if (ex is WampConnectionBrokenException || IsExpectedTransportAbort(ex))
+            {
+                OnChildLogString?.Invoke(this, operationName + ": transport closed during RPC: " + ex.Message + ". " + GetConnectionDebugState());
+                MarkWampConnectionBroken(operationName);
+                return;
+            }
+
+            OnChildLogString?.Invoke(this, operationName + ": " + ex + ". " + GetConnectionDebugState());
         }
 
         #endregion internal connect
@@ -736,37 +1151,42 @@ namespace Wamp.Client
         #region real proxy event handlers
 
         /***********************************************************************************************************************/
-        private void Monitor_ConnectionEstablished(object sender, WampSessionCreatedEventArgs e)
-        /***********************************************************************************************************************/
+        private async void Monitor_ConnectionEstablished(object sender, WampSessionCreatedEventArgs e)
         {
-            // notify connection is established
-            IsConnected = true;
-
-            if (RenewAccessTokenRequested)
+            try
             {
-                RenewAccessTokenRequested = false;
+                if (!TryGetActiveGenerationForMonitor(sender, out var generation))
+                {
+                    OnChildLogString?.Invoke(this, "Ignoring stale WAMP connection established callback.");
+                    return;
+                }
+
+                OnChildLogString?.Invoke(this, $"WAMP connection established. Generation={generation}. " + GetConnectionDebugState());
+
+                SetConnectionLifecycleState(generation, ConnectionLifecycleState.Connected, true);
+
+                await RegisterCalleeServices().ConfigureAwait(false);
+
+                if (RenewAccessTokenRequested)
+                {
+                    OnChildLogString?.Invoke(this, $"Monitor_ConnectionEstablished: renew flow detected for Generation={generation}.");
+                    RenewAccessTokenRequested = false;
+                }
+                else
+                {
+                    OnChildLogString?.Invoke(this, $"Monitor_ConnectionEstablished: raising OnConnectChanged(true) for Generation={generation}.");
+                    OnConnectChanged?.Invoke(this, true);
+                }
+
+                StartRenewAccessTokenTimer();
             }
-            else
+            catch (Exception ex)
             {
-                OnConnectChanged?.Invoke(this, true);
+                OnChildLogString?.Invoke(this,
+                    "Exception in Monitor_ConnectionEstablished: " + ex);
+
+                MarkWampConnectionBroken("Monitor_ConnectionEstablished");
             }
-
-            // Start the timer for renewal of the access token.
-
-            if (RenewAccessTokenTimer != null)
-            {
-                //Delete timer
-                RenewAccessTokenTimer.Dispose();
-                RenewAccessTokenTimer = null;
-                RenewAccessTokenRequested = false;
-            }
-
-            // Timeout in ZCP is 30 minutes
-            const Int32 minutes_29 = 29 * 60 * 1000; //ms
-
-            RenewAccessTokenTimer = new Timer(RenewAccessTokenTimer_Tick, null, minutes_29, minutes_29);
-
-            // For Test: RenewAccessTokenTimer = new Timer(RenewAccessTokenTimer_Tick, null, 10000, 10000);
         }
 
 
@@ -774,21 +1194,80 @@ namespace Wamp.Client
         private void Monitor_ConnectionError(object sender, WampConnectionErrorEventArgs e)
         /***********************************************************************************************************************/
         {
-            // notify connection establishing error
-            IsConnected = false;
+            if (!TryGetActiveGenerationForMonitor(sender, out var generation))
+            {
+                OnChildLogString?.Invoke(this, "Ignoring stale WAMP connection error callback.");
+                return;
+            }
+
+            OnChildLogString?.Invoke(this, $"WAMP connection error: Generation={generation}, Exception={e.Exception}. " + GetConnectionDebugState());
+
+            SetConnectionLifecycleState(generation, ConnectionLifecycleState.Reconnecting, false);
+
+            Task.Run(async () =>
+            {
+                await RegisterCalleeServicesDisposeAsync().ConfigureAwait(false);
+                StartReconnect();
+            });
+
             OnConnectChanged?.Invoke(this, false);
         }
 
 
         /***********************************************************************************************************************/
         private void Monitor_ConnectionBroken(object sender, WampSessionCloseEventArgs e)
-        /***********************************************************************************************************************/
         {
-            // notify established connection is broken
-            IsConnected = false;
+            if (!TryGetActiveGenerationForMonitor(sender, out var generation))
+            {
+                OnChildLogString?.Invoke(this, "Ignoring stale WAMP connection broken callback.");
+                return;
+            }
+
+            OnChildLogString?.Invoke(this, $"WAMP connection broken. Generation={generation}, CloseType={e.CloseType}. " + GetConnectionDebugState());
+
+            SetConnectionLifecycleState(generation, ConnectionLifecycleState.Reconnecting, false);
+
+            Task.Run(async () =>
+            {
+                await RegisterCalleeServicesDisposeAsync().ConfigureAwait(false);
+                StartReconnect();
+            });
+
             OnConnectChanged?.Invoke(this, false);
-       
-            // reconnect should be started
+        }
+
+        private void MarkWampConnectionBroken(string source)
+        {
+            try
+            {
+                var channelContext = CaptureActiveChannelContext();
+                var generation = channelContext?.Generation ?? 0;
+
+                if (generation == 0 || !IsCurrentGeneration(generation))
+                {
+                    OnChildLogString?.Invoke(this,
+                        "Ignoring broken-state transition from stale channel in " + source + ".");
+                    return;
+                }
+
+                OnChildLogString?.Invoke(this,
+                    $"WAMP connection marked broken by {source}. Generation={generation}. " + GetConnectionDebugState());
+
+                SetConnectionLifecycleState(generation, ConnectionLifecycleState.Reconnecting, false);
+
+                Task.Run(async () =>
+                {
+                    await RegisterCalleeServicesDisposeAsync().ConfigureAwait(false);
+                    StartReconnect();
+                });
+
+                OnConnectChanged?.Invoke(this, false);
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this,
+                    "Exception in MarkWampConnectionBroken: " + ex);
+            }
         }
 
         #endregion real proxy event handlers
@@ -802,11 +1281,25 @@ namespace Wamp.Client
         private object GetSystemDevicesRegistered()
         /***********************************************************************************************************************/
         {
-            // get service
-            var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+            try
+            {
+                if (!TryGetActiveServices(out _, out var svc, out _, "GetSystemDevicesRegistered"))
+                {
+                    return null;
+                }
 
-            // try call function
-            return svc.SystemDevicesRegistered();
+                return svc.SystemDevicesRegistered();
+            }
+            catch (WampConnectionBrokenException ex)
+            {
+                HandleExpectedRpcFailure("GetSystemDevicesRegistered", ex);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                HandleExpectedRpcFailure("GetSystemDevicesRegistered", ex);
+                return null;
+            }
         }
 
 
@@ -815,11 +1308,20 @@ namespace Wamp.Client
         private object GetInterfaceList()
         /***********************************************************************************************************************/
         {
-            // get service
-            var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+            try
+            {
+                if (!TryGetActiveServices(out _, out var svc, out _, "GetInterfaceList"))
+                {
+                    return null;
+                }
 
-            // try call function
-            return svc.InterfaceList();
+                return svc.InterfaceList();
+            }
+            catch (Exception ex)
+            {
+                HandleExpectedRpcFailure("GetInterfaceList", ex);
+                return null;
+            }
         }
 
 
@@ -829,16 +1331,17 @@ namespace Wamp.Client
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_calls"))
+                {
+                    return null;
+                }
 
-                // try call function
                 return svc.GET_calls(dirNo, callId, state);
 
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_calls: " + ex.ToString());
+                HandleExpectedRpcFailure("GET_calls", ex);
                 return null;
             }
         }
@@ -850,15 +1353,16 @@ namespace Wamp.Client
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_call_queue_legs"))
+                {
+                    return null;
+                }
 
-                // try call function
                 return svc.GET_call_legs(fromDirNo, toDirNo, dirNo, legId, callId, State, legRole);
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_calls_queue: " + ex.ToString());
+                HandleExpectedRpcFailure("GET_call_queue_legs", ex);
                 return null;
             }
         }
@@ -867,38 +1371,149 @@ namespace Wamp.Client
         /***********************************************************************************************************************/
         private object GET_calls_queued(string queueDirNo)
         {
+            var callId = Guid.NewGuid().ToString("N");
+
             try
             {
-                if (_wampRealmProxy == null || !IsConnected)
+                OnChildLogString?.Invoke(this,
+                    $"GET_calls_queued START CallId={callId}, QueueDirNo='{queueDirNo ?? "<null>"}'");
+
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_calls_queued"))
                 {
-                    OnChildLogString?.Invoke(this, "GET_calls_queued: not connected (realm proxy not ready).");
+                    OnChildLogString?.Invoke(this,
+                        $"GET_calls_queued ABORT unable to acquire active service proxy CallId={callId}");
                     return null;
                 }
 
-                var services = _wampRealmProxy.Services;
-                if (services == null)
+                OnChildLogString?.Invoke(this,
+                    $"GET_calls_queued PROXY READY CallId={callId}");
+
+                var task = System.Threading.Tasks.Task.Run(() =>
                 {
-                    OnChildLogString?.Invoke(this, "GET_calls_queued: realm proxy services not ready.");
+                    OnChildLogString?.Invoke(this,
+                        $"GET_calls_queued ENTER RPC CallId={callId}, Thread={System.Threading.Thread.CurrentThread.ManagedThreadId}");
+
+                    object result;
+
+                    // IMPORTANT: omit optional param if empty
+                    if (string.IsNullOrWhiteSpace(queueDirNo))
+                    {
+                        OnChildLogString?.Invoke(this,
+                            $"GET_calls_queued CALL no-arg CallId={callId}. {GetConnectionDebugState()}");
+
+                        result = svc.GET_call_queues();
+                    }
+                    else
+                    {
+                        OnChildLogString?.Invoke(this,
+                            $"GET_calls_queued CALL one-arg CallId={callId}, queue_dirno='{queueDirNo}'. {GetConnectionDebugState()}");
+
+                        result = svc.GET_call_queues(queueDirNo);
+                    }
+
+                    OnChildLogString?.Invoke(this,
+                        $"GET_calls_queued EXIT RPC CallId={callId}, ResultNull={result == null}");
+
+                    return result;
+                });
+
+                if (!task.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    ObserveTimedOutRpcTask(task, callId, queueDirNo);
+
+                    OnChildLogString?.Invoke(this,
+                        $"GET_calls_queued TIMEOUT CallId={callId}, QueueDirNo='{queueDirNo ?? "<null>"}'");
+
                     return null;
                 }
 
-                var svc = services.GetCalleeProxy<IConnectWampServices>();
-                if (svc == null)
-                {
-                    OnChildLogString?.Invoke(this, "GET_calls_queued: callee proxy unavailable.");
-                    return null;
-                }
+                var finalResult = task.GetAwaiter().GetResult();
 
-                // IMPORTANT: omit optional param if empty
-                return string.IsNullOrWhiteSpace(queueDirNo)
-                    ? svc.GET_call_queues()
-                    : svc.GET_call_queues(queueDirNo);
+                OnChildLogString?.Invoke(this,
+                    $"GET_calls_queued END CallId={callId}, ResultNull={finalResult == null}");
+
+                return finalResult;
+            }
+            catch (WampConnectionBrokenException ex)
+            {
+                HandleExpectedRpcFailure("GET_calls_queued", ex);
+                return null;
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_calls_queued: " + ex);
+                HandleExpectedRpcFailure("GET_calls_queued", ex);
                 return null;
             }
+        }
+
+        /***********************************************************************************************************************/
+        private void ObserveTimedOutRpcTask(System.Threading.Tasks.Task<object> task, string callId, string queueDirNo)
+        /***********************************************************************************************************************/
+        {
+            task.ContinueWith(t =>
+            {
+                var exception = t.Exception?.GetBaseException();
+
+                if (exception == null)
+                {
+                    return;
+                }
+
+                if (IsExpectedTransportAbort(exception))
+                {
+                    OnChildLogString?.Invoke(this,
+                        $"GET_calls_queued timed-out RPC ended after disconnect CallId={callId}, QueueDirNo='{queueDirNo ?? "<null>"}': {exception.Message}");
+                    return;
+                }
+
+                OnChildLogString?.Invoke(this,
+                    $"GET_calls_queued timed-out RPC faulted CallId={callId}, QueueDirNo='{queueDirNo ?? "<null>"}': {exception}");
+            },
+            System.Threading.CancellationToken.None,
+            System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted | System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously,
+            System.Threading.Tasks.TaskScheduler.Default);
+        }
+
+        /***********************************************************************************************************************/
+        private static bool IsExpectedTransportAbort(Exception ex)
+        /***********************************************************************************************************************/
+        {
+            if (ex == null)
+            {
+                return false;
+            }
+
+            if (ex is AggregateException aggregateException)
+            {
+                foreach (var innerException in aggregateException.Flatten().InnerExceptions)
+                {
+                    if (IsExpectedTransportAbort(innerException))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            if (ex is WampConnectionBrokenException)
+            {
+                return true;
+            }
+
+            if (ex is System.Net.Sockets.SocketException socketException)
+            {
+                return socketException.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionAborted ||
+                       socketException.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionReset ||
+                       socketException.SocketErrorCode == System.Net.Sockets.SocketError.OperationAborted;
+            }
+
+            if (ex is IOException || ex is ObjectDisposedException)
+            {
+                return IsExpectedTransportAbort(ex.InnerException);
+            }
+
+            return IsExpectedTransportAbort(ex.InnerException);
         }
 
         /***********************************************************************************************************************/
@@ -906,6 +1521,11 @@ namespace Wamp.Client
         {
             try
             {
+                if (!TryGetActiveRpcCatalog(out var realmProxy, out _, "GET_devices_gpos"))
+                {
+                    return null;
+                }
+
                 // The backend expects a payload with a 'dirno' key (not 'device_id').
                 // Follow the same pattern as GET_devices_gpis: provide the payload as both
                 // the single positional arg and as kwargs.
@@ -923,7 +1543,7 @@ namespace Wamp.Client
 
                 var rpcCallback = new RPCCallback();
 
-                _wampRealmProxy.RpcCatalog.Invoke(
+                realmProxy.RpcCatalog.Invoke(
                     rpcCallback,
                     new CallOptions(),
                     WampClient.GetWampDevicesGpos,
@@ -961,7 +1581,7 @@ namespace Wamp.Client
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpos: " + ex);
+                HandleExpectedRpcFailure("GET_devices_gpos", ex);
                 return null;
             }
         }
@@ -995,8 +1615,10 @@ namespace Wamp.Client
         {
             try
             {
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
-                var response = svc.GET_devices_gpis(device_id_or_dirno, id);
+                if (!TryGetActiveRpcCatalog(out var realmProxy, out _, "GET_devices_gpis"))
+                {
+                    return null;
+                }
 
                 var dirno = (device_id_or_dirno ?? "").Trim();
                 if (string.IsNullOrWhiteSpace(dirno))
@@ -1023,7 +1645,7 @@ namespace Wamp.Client
 
                 var rpcCallback = new RPCCallback();
 
-                _wampRealmProxy.RpcCatalog.Invoke(
+                realmProxy.RpcCatalog.Invoke(
                     rpcCallback,
                     new WampSharp.V2.Core.Contracts.CallOptions(),
                     "com.zenitel.devices.device.gpis",
@@ -1067,7 +1689,7 @@ namespace Wamp.Client
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpis: " + ex);
+                HandleExpectedRpcFailure("GET_devices_gpis", ex);
                 return null;
             }
         }
@@ -1079,15 +1701,16 @@ namespace Wamp.Client
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_PlatformVersion"))
+                {
+                    return null;
+                }
 
-                // try call function
                 return svc.GetPlatformVersion();
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GetPlatformVersion: " + ex.ToString());
+                HandleExpectedRpcFailure("GET_PlatformVersion", ex);
                 return null;
             }
         }
@@ -1098,16 +1721,17 @@ namespace Wamp.Client
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_groups"))
+                {
+                    return null;
+                }
 
-                // try call function
                 return svc.GET_groups(dirno, verbose);
 
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpis: " + ex.ToString());
+                HandleExpectedRpcFailure("GET_groups", ex);
                 return null;
             }
         }
@@ -1118,16 +1742,17 @@ namespace Wamp.Client
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_audio_messages"))
+                {
+                    return null;
+                }
 
-                // try call function
                 return svc.GET_audio_messages();
 
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpis: " + ex.ToString());
+                HandleExpectedRpcFailure("GET_audio_messages", ex);
                 return null;
             }
         }
@@ -1138,16 +1763,17 @@ namespace Wamp.Client
         {
             try
             {
-                // get service
-                var svc = _wampRealmProxy.Services.GetCalleeProxy<IConnectWampServices>();
+                if (!TryGetActiveServices(out _, out var svc, out _, "GET_directories"))
+                {
+                    return null;
+                }
 
-                // try call function
                 return svc.GET_directories(dirno);
 
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in GET_devices_gpis: " + ex.ToString());
+                HandleExpectedRpcFailure("GET_directories", ex);
                 return null;
             }
         }

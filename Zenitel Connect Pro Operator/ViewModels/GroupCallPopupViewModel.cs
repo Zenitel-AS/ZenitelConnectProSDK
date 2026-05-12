@@ -63,7 +63,7 @@ public partial class GroupCallPopupViewModel : ObservableObject
             await _connectPro.Core.CallHandler.DeleteCall(_group.Dirno);
         }
 
-        _group.IsBusy = false;
+        //_group.IsBusy = false;
         _owner.RefreshCommand.Execute(null);
 
         RequestClose?.Invoke(this, EventArgs.Empty);

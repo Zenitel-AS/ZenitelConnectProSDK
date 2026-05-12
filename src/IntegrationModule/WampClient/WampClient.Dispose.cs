@@ -38,7 +38,7 @@ namespace Wamp.Client
 
         private void DisposeTraceSubscriptions()
         {
-            SafeDisposeStep("RegisterCalleeServicesDispose", RegisterCalleeServicesDispose);
+            SafeDisposeStep("RegisterCalleeServicesDispose", () => RegisterCalleeServicesDisposeAsync().GetAwaiter().GetResult());
             SafeDisposeStep("TraceAudioDataReceivingDispose", TraceAudioDataReceivingDispose);
             SafeDisposeStep("TraceAudioDetectorAliveDispose", TraceAudioDetectorAliveDispose);
             SafeDisposeStep("TraceAudioEventDetectionDispose", TraceAudioEventDetectionDispose);

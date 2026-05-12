@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
 using WampSharp.V2.Core.Contracts;
@@ -24,6 +25,11 @@ namespace Wamp.Client
         /// </summary>
         public async void TraceAudioDetectorAlive()
         {
+            await TraceAudioDetectorAliveAsync().ConfigureAwait(false);
+        }
+
+        internal async Task TraceAudioDetectorAliveAsync()
+        {
             try
             {
                 lock (_traceAudioDetectorAliveGate)
@@ -37,6 +43,9 @@ namespace Wamp.Client
                     OnChildLogString?.Invoke(this, "TraceAudioDetectorAlive skipped. WAMP realm proxy is not available.");
                     return;
                 }
+
+                OnChildLogString?.Invoke(this,
+                    "TraceAudioDetectorAlive starting subscription on current realm. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
 
                 IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampAudioDetectorAlive);
 
@@ -60,6 +69,9 @@ namespace Wamp.Client
 
                     tracerAudioDetectorAlive = tracer;
                     tracerAudioDetectorAlivesDisposable = subscription;
+
+                    OnChildLogString?.Invoke(this,
+                        "TraceAudioDetectorAlive subscription established. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
                 }
             }
             catch (Exception ex)

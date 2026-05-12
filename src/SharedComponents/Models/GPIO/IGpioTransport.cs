@@ -1,8 +1,10 @@
 ﻿using ConnectPro.Models;
+using ConnectPro.Models.Responses;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using static Wamp.Client.WampClient;
 
 namespace SharedComponents.Models.GPIO
 {
@@ -21,7 +23,7 @@ namespace SharedComponents.Models.GPIO
         /// Sets a GPO output state. "active=true" activates, "false" deactivates.
         /// timeSeconds is optional (when supported by backend).
         /// </summary>
-        Task SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct);
+        Task<ObjectResponse> SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct);
 
         /// <summary>
         /// Ensures the transport is subscribed to GPIO change events for the specified device.

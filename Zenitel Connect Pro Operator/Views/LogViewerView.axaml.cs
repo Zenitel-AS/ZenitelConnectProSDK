@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using ZenitelConnectProOperator.ViewModels;
@@ -23,5 +24,17 @@ public partial class LogViewerView : UserControl
             .GetValue(App.Current) is IServiceProvider sp
                 ? ActivatorUtilities.CreateInstance<LogViewerViewModel>(sp)
                 : new LogViewerViewModel();
+    }
+
+    private async void CopyLog_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LogViewerViewModel viewModel)
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+            return;
+
+        await clipboard.SetTextAsync(viewModel.GetLogText());
     }
 }

@@ -22,15 +22,56 @@ namespace Wamp.Client
         /// </returns>
 
         /***********************************************************************************************************************/
+        /// <summary>This method will request all registered devices.</summary>
+        /// <returns>
+        /// The method returns the list of all registered devices. Each element contains the device directory number and the current
+        /// connection state reachable / not reachable.
+        /// </returns>
+
+        /***********************************************************************************************************************/
         public List<wamp_device_registration_element> requestRegisteredDevices()
         /***********************************************************************************************************************/
         {
-            object res = GetSystemDevicesRegistered();
-            string json_str = res.ToString();
-            OnChildLogString?.Invoke(this, json_str);
+            try
+            {
+                object res = GetSystemDevicesRegistered();
 
-            List<wamp_device_registration_element> registeredDevices = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_device_registration_element>>(json_str);
-            return registeredDevices;
+                if (res == null)
+                {
+                    OnChildLogString?.Invoke(this,
+                        "requestRegisteredDevices: no response from GetSystemDevicesRegistered.");
+                    return new List<wamp_device_registration_element>();
+                }
+
+                string json_str = res.ToString();
+
+                if (string.IsNullOrWhiteSpace(json_str))
+                {
+                    OnChildLogString?.Invoke(this,
+                        "requestRegisteredDevices: empty response from GetSystemDevicesRegistered.");
+                    return new List<wamp_device_registration_element>();
+                }
+
+                OnChildLogString?.Invoke(this, json_str);
+
+                var registeredDevices =
+                    Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_device_registration_element>>(json_str);
+
+                if (registeredDevices == null)
+                {
+                    OnChildLogString?.Invoke(this,
+                        "requestRegisteredDevices: deserialized result was null.");
+                    return new List<wamp_device_registration_element>();
+                }
+
+                return registeredDevices;
+            }
+            catch (Exception ex)
+            {
+                OnChildLogString?.Invoke(this,
+                    "Exception in requestRegisteredDevices: " + ex);
+                return new List<wamp_device_registration_element>();
+            }
         }
 
         /// <summary>
@@ -62,11 +103,27 @@ namespace Wamp.Client
         /***********************************************************************************************************************/
         {
             object res = GET_calls(dirNo, callId, state);
+
+            if (res == null)
+            {
+                OnChildLogString?.Invoke(this,
+                    "requestCallList: no response from GET_calls.");
+                return new List<wamp_call_element>();
+            }
+
             string json_str = res.ToString();
+
+            if (string.IsNullOrWhiteSpace(json_str))
+            {
+                OnChildLogString?.Invoke(this,
+                    "requestCallList: empty response from GET_calls.");
+                return new List<wamp_call_element>();
+            }
+
             OnChildLogString?.Invoke(this, json_str);
 
             List<wamp_call_element> callList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_call_element>>(json_str);
-            return callList;
+            return callList ?? new List<wamp_call_element>();
         }
 
         /// <summary>
@@ -112,11 +169,27 @@ namespace Wamp.Client
         /***********************************************************************************************************************/
         {
             object res = GET_call_queue_legs(fromDirNo, toDirNo, dirNo, legId, callId, State, legRole);
+
+            if (res == null)
+            {
+                OnChildLogString?.Invoke(this,
+                    "requestCallLegs: no response from GET_call_queue_legs.");
+                return new List<wamp_call_leg_element>();
+            }
+
             string json_str = res.ToString();
+
+            if (string.IsNullOrWhiteSpace(json_str))
+            {
+                OnChildLogString?.Invoke(this,
+                    "requestCallLegs: empty response from GET_call_queue_legs.");
+                return new List<wamp_call_leg_element>();
+            }
+
             OnChildLogString?.Invoke(this, json_str);
 
             List<WampClient.wamp_call_leg_element> callQueueLegList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<wamp_call_leg_element>>(json_str);
-            return callQueueLegList;
+            return callQueueLegList ?? new List<wamp_call_leg_element>();
         }
 
 

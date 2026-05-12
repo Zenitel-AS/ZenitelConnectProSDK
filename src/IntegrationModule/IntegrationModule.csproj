@@ -23,7 +23,7 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageId>Zenitel.ConnectPro.SDK</PackageId>
-		<Version>1.2.4</Version>
+		<Version>1.2.5.4</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -57,11 +57,19 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<!-- Generates .snupkg -->
 		<Deterministic>true</Deterministic>
-		<FileVersion>1.1.1.0</FileVersion>
-		<AssemblyVersion>1.1.1.0</AssemblyVersion>
+		<FileVersion>1.2.5.4</FileVersion>
+		<AssemblyVersion>1.2.5.4</AssemblyVersion>
 		<Title>Zenitel Connect Pro SDK</Title>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<!-- Ensures builds are reproducible -->
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netstandard2.1|AnyCPU'">
+	  <DebugType>embedded</DebugType>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net48|AnyCPU'">
+	  <DebugType>embedded</DebugType>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -1,4 +1,5 @@
-﻿using ConnectPro.Models;
+﻿using ConnectPro.Enums;
+using ConnectPro.Models;
 using ConnectPro.Tools;
 using Newtonsoft.Json;
 using System;
@@ -24,20 +25,12 @@ namespace ConnectPro.Handlers
         private RestClient _rest;
         private object _lockObj = new object();
         private CancellationTokenSource _playbackCancellationTokenSource;
+        private readonly SemaphoreSlim _groupsRetrievalGate = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _audioMessagesRetrievalGate = new SemaphoreSlim(1, 1);
         private const double GroupReconcileIntervalMs = 5000;
         private const double AudioMessageReconcileIntervalMs = 5000;
         private Timer GroupsRetrievalTimer { get; set; }
         private Timer AudioMessagesRetrievalTimer { get; set; }
-
-        /// <summary>
-        /// Indicates whether group retrieval is currently being executed.
-        /// </summary>
-        public bool IsExecutingGroupRetrieval { get; set; } = false;
-
-        /// <summary>
-        /// Indicates whether audio message retrieval is currently being executed.
-        /// </summary>
-        public bool IsExecutingAudioMessagesRetrieval { get; set; } = false;
 
         /// <summary>
         /// Gets or sets the IP address of the parent device.
@@ -65,6 +58,7 @@ namespace ConnectPro.Handlers
             ParentIpAddress = parentIpAddress;
 
             _events.OnConnectionChanged += HandleConnectionChange;
+            _events.OnCallEvent += HandleGroupCall;
             InitializeGroupsRetrievalTimer();
             InitializeAudioMessagesRetrievalTimer();
         }
@@ -82,9 +76,9 @@ namespace ConnectPro.Handlers
                 StartAudioMessagesRetrievalTimer();
 
                 if (_collections.Groups.Count == 0)
-                    Task.Run(async () => await RetrieveGroups());
+                    _ = RetrieveGroups();
                 if (_collections.AudioMessages.Count == 0)
-                    Task.Run(async () => await RetrieveAudioMessages());
+                    _ = RetrieveAudioMessages();
             }
             else
             {
@@ -108,20 +102,65 @@ namespace ConnectPro.Handlers
             }
         }
 
-        private void OnGroupsRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void HandleGroupCall(object sender, CallElement callElement)
         {
-            if (!_wamp.IsConnected)
+            if (_disposed || callElement == null)
                 return;
 
-            Task.Run(async () => await RetrieveGroups().ConfigureAwait(false));
+            Group matchedGroup;
+
+            lock (_lockObj)
+            {
+                matchedGroup = _collections.Groups?.FirstOrDefault(x => x.Dirno == callElement.FromDirno
+                                                                     || x.Dirno == callElement.ToDirno
+                                                                     || x.Dirno == callElement.ToDirnoCurrent);
+            }
+
+            if (matchedGroup != null)
+                matchedGroup.IsBusy = CallStateMapper.IsBusy(callElement.CallState);
+
         }
 
-        private void OnAudioMessagesRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private static bool TryEnterGate(SemaphoreSlim gate)
         {
-            if (!_wamp.IsConnected)
+            try
+            {
+                return gate.Wait(0);
+            }
+            catch (ObjectDisposedException)
+            {
+                return false;
+            }
+        }
+
+        private static void ReleaseGate(SemaphoreSlim gate)
+        {
+            try
+            {
+                gate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SemaphoreFullException)
+            {
+            }
+        }
+
+        private async void OnGroupsRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (_disposed || !_wamp.IsConnected)
                 return;
 
-            Task.Run(async () => await RetrieveAudioMessages().ConfigureAwait(false));
+            await RetrieveGroups().ConfigureAwait(false);
+        }
+
+        private async void OnAudioMessagesRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (_disposed || !_wamp.IsConnected)
+                return;
+
+            await RetrieveAudioMessages().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -130,51 +169,94 @@ namespace ConnectPro.Handlers
         /// </summary>
         public async Task RetrieveGroups()
         {
-            lock (_lockObj)
-            {
-                if (IsExecutingGroupRetrieval)
-                    return;
-                IsExecutingGroupRetrieval = true;
-            }
+            if (_disposed || !TryEnterGate(_groupsRetrievalGate))
+                return;
 
             try
             {
-                if (_wamp.IsConnected)
+                if (!_wamp.IsConnected)
+                    return;
+
+                var groups = GetGroups().ToList();
+                await FillGroupMembersFromRestAsync(groups).ConfigureAwait(false);
+
+                bool listChanged;
+                List<Group> addedGroups;
+                List<Group> removedGroups;
+
+                lock (_lockObj)
                 {
-                    var groups = GetGroups().ToList();
-                    await FillGroupMembersFromRestAsync(groups);
+                    var existingGroups = _collections.Groups ?? new List<Group>();
+                    addedGroups = new List<Group>();
+                    removedGroups = new List<Group>();
 
-                    bool listChanged;
-                    List<Group> addedGroups;
-                    List<Group> removedGroups;
+                    var latestByKey = groups
+                        .Where(g => g != null)
+                        .GroupBy(GetGroupKey, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-                    lock (_lockObj)
+                    var existingByKey = existingGroups
+                        .Where(g => g != null)
+                        .GroupBy(GetGroupKey, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+                    var updated = false;
+
+                    foreach (var latest in groups)
                     {
-                        var existingGroups = _collections.Groups ?? new List<Group>();
+                        if (latest == null)
+                            continue;
 
-                        var updated = CollectionReconciler.DiffByKey(
-                            existingGroups,
-                            groups,
-                            GetGroupKey,
-                            StringComparer.OrdinalIgnoreCase,
-                            HasGroupChanged,
-                            out addedGroups,
-                            out removedGroups);
+                        var key = GetGroupKey(latest);
+                        Group existing;
 
-                        listChanged = addedGroups.Count > 0 || removedGroups.Count > 0 || updated;
-                        _collections.Groups = groups;
+                        if (existingByKey.TryGetValue(key, out existing))
+                        {
+                            if (HasGroupChanged(existing, latest))
+                            {
+                                existing.DisplayName = latest.DisplayName;
+                                existing.Priority = latest.Priority;
+                                existing.Members = latest.Members;
+                                updated = true;
+                            }
+                        }
+                        else
+                        {
+                            existingGroups.Add(latest);
+                            existingByKey[key] = latest;
+                            addedGroups.Add(latest);
+                        }
                     }
 
-                    if (listChanged)
+                    for (int i = existingGroups.Count - 1; i >= 0; i--)
                     {
-                        foreach (var addedGroup in addedGroups)
-                            _events.OnGroupAdded?.Invoke(this, addedGroup);
+                        var existing = existingGroups[i];
+                        if (existing == null)
+                            continue;
 
-                        foreach (var removedGroup in removedGroups)
-                            _events.OnGroupRemoved?.Invoke(this, removedGroup);
-
-                        _events.OnGroupsListChange?.Invoke(this, new EventArgs());
+                        var key = GetGroupKey(existing);
+                        if (!latestByKey.ContainsKey(key))
+                        {
+                            existingGroups.RemoveAt(i);
+                            removedGroups.Add(existing);
+                        }
                     }
+
+                    listChanged = addedGroups.Count > 0 || removedGroups.Count > 0 || updated;
+
+                    if (_collections.Groups == null)
+                        _collections.Groups = existingGroups;
+                }
+
+                if (listChanged)
+                {
+                    foreach (var addedGroup in addedGroups)
+                        _events.OnGroupAdded?.Invoke(this, addedGroup);
+
+                    foreach (var removedGroup in removedGroups)
+                        _events.OnGroupRemoved?.Invoke(this, removedGroup);
+
+                    _events.OnGroupsListChange?.Invoke(this, EventArgs.Empty);
                 }
             }
             catch (Exception exe)
@@ -184,7 +266,7 @@ namespace ConnectPro.Handlers
             }
             finally
             {
-                IsExecutingGroupRetrieval = false;
+                ReleaseGate(_groupsRetrievalGate);
             }
         }
 
@@ -268,69 +350,59 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Retrieves audio messages from the server and updates the audio messages collection.
         /// </summary>
-        public async Task RetrieveAudioMessages()
+        public Task RetrieveAudioMessages()
         {
-            await Task.Run(() =>
+            if (_disposed || !TryEnterGate(_audioMessagesRetrievalGate))
+                return Task.CompletedTask;
+
+            try
             {
-                List<AudioMessage> addedMessages = new List<AudioMessage>();
-                List<AudioMessage> removedMessages = new List<AudioMessage>();
-                bool listChanged = false;
+                if (!_wamp.IsConnected)
+                    return Task.CompletedTask;
+
+                var latestMessages = GetAudioMessages().AudioMessages?.ToList() ?? new List<AudioMessage>();
+                List<AudioMessage> addedMessages;
+                List<AudioMessage> removedMessages;
+                bool listChanged;
 
                 lock (_lockObj)
                 {
-                    if (IsExecutingAudioMessagesRetrieval)
-                        return;
+                    var existingMessages = _collections.AudioMessages ?? new List<AudioMessage>();
 
-                    IsExecutingAudioMessagesRetrieval = true;
+                    CollectionReconciler.DiffByKey(
+                        existingMessages,
+                        latestMessages,
+                        GetAudioMessageKey,
+                        StringComparer.OrdinalIgnoreCase,
+                        out addedMessages,
+                        out removedMessages);
+
+                    listChanged = addedMessages.Count > 0 || removedMessages.Count > 0;
+
+                    if (listChanged)
+                        _collections.AudioMessages = latestMessages;
                 }
 
-                try
-                {
-                    if (_wamp.IsConnected)
-                    try
-                    {
-                        var latestMessages = GetAudioMessages().AudioMessages?.ToList() ?? new List<AudioMessage>();
+                foreach (var addedMessage in addedMessages)
+                    _events.OnAudioMessageAdded?.Invoke(this, addedMessage);
 
-                        lock (_lockObj)
-                        {
-                            var existingMessages = _collections.AudioMessages ?? new List<AudioMessage>();
+                foreach (var removedMessage in removedMessages)
+                    _events.OnAudioMessageRemoved?.Invoke(this, removedMessage);
 
-                            CollectionReconciler.DiffByKey(
-                                existingMessages,
-                                latestMessages,
-                                GetAudioMessageKey,
-                                StringComparer.OrdinalIgnoreCase,
-                                out addedMessages,
-                                out removedMessages);
+                if (listChanged)
+                    _events.OnAudioMessagesChange?.Invoke(this, false);
+            }
+            catch (Exception exe)
+            {
+                _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
+                _events.OnExceptionThrown?.Invoke(this, exe);
+            }
+            finally
+            {
+                ReleaseGate(_audioMessagesRetrievalGate);
+            }
 
-                            listChanged = addedMessages.Count > 0 || removedMessages.Count > 0;
-
-                            _collections.AudioMessages = latestMessages;
-                        }
-
-                        foreach (var addedMessage in addedMessages)
-                            _events.OnAudioMessageAdded?.Invoke(this, addedMessage);
-
-                        foreach (var removedMessage in removedMessages)
-                            _events.OnAudioMessageRemoved?.Invoke(this, removedMessage);
-
-                        if (listChanged)
-                            _events.OnAudioMessagesChange?.Invoke(this, false);
-                    }
-                    catch (Exception exe)
-                    {
-                        _events.OnDebugChanged?.Invoke(this, (exe.Message, exe));
-                        _events.OnExceptionThrown?.Invoke(this, exe);
-                    }
-                }
-                finally
-                {
-                    lock (_lockObj)
-                    {
-                        IsExecutingAudioMessagesRetrieval = false;
-                    }
-                }
-            });
+            return Task.CompletedTask;
         }
 
         private static string GetAudioMessageKey(AudioMessage audioMessage)
@@ -338,11 +410,10 @@ namespace ConnectPro.Handlers
             if (audioMessage == null)
                 return string.Empty;
 
-            return (audioMessage.MessageId.ToString() + "|"
+            return audioMessage.MessageId.ToString() + "|"
                 + (audioMessage.Dirno ?? string.Empty) + "|"
                 + (audioMessage.FilePath ?? string.Empty) + "|"
-                + (audioMessage.FileName ?? string.Empty))
-                .ToLowerInvariant();
+                + (audioMessage.FileName ?? string.Empty);
         }
 
         private static string GetGroupKey(Group group)
@@ -350,7 +421,7 @@ namespace ConnectPro.Handlers
             if (group == null)
                 return string.Empty;
 
-            return (group.Dirno ?? string.Empty).ToLowerInvariant();
+            return group.Dirno ?? string.Empty;
         }
 
         private static bool HasGroupChanged(Group existing, Group latest)
@@ -441,7 +512,11 @@ namespace ConnectPro.Handlers
         /// <param name="msg">The audio message to stop.</param>
         public void StopAudioMessage(AudioMessage msg)
         {
-            _playbackCancellationTokenSource?.Cancel();
+            var oldCts = _playbackCancellationTokenSource;
+            _playbackCancellationTokenSource = null;
+
+            oldCts?.Cancel();
+            oldCts?.Dispose();
             _wamp.DeleteCalls(msg.Dirno);
             msg.IsPlaying = false;
             _events.OnAudioMessagesChange?.Invoke(msg, false);
@@ -458,7 +533,10 @@ namespace ConnectPro.Handlers
         {
             if (audioMessage == null) return;
 
-            _playbackCancellationTokenSource?.Cancel();
+            var oldCts = _playbackCancellationTokenSource;
+            oldCts?.Cancel();
+            oldCts?.Dispose();
+
             _playbackCancellationTokenSource = new CancellationTokenSource();
             var cancellationToken = _playbackCancellationTokenSource.Token;
 
@@ -526,12 +604,15 @@ namespace ConnectPro.Handlers
             if (_disposed)
                 return;
 
+            _disposed = true;
+
             if (disposing)
             {
                 // Unsubscribe from events
                 if (_events != null)
                 {
                     _events.OnConnectionChanged -= HandleConnectionChange;
+                    _events.OnCallEvent -= HandleGroupCall;
                 }
 
                 if (AudioMessagesRetrievalTimer != null)
@@ -557,12 +638,15 @@ namespace ConnectPro.Handlers
                     _playbackCancellationTokenSource.Dispose();
                     _playbackCancellationTokenSource = null;
                 }
-            }
 
-            _disposed = true;
+                try { _groupsRetrievalGate.Dispose(); } catch { }
+                try { _audioMessagesRetrievalGate.Dispose(); } catch { }
+            }
         }
 
         #endregion
+
+       
 
     }
 }

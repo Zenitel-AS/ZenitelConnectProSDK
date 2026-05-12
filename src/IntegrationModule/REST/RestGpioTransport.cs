@@ -1,6 +1,7 @@
 using ConnectPro;
 using ConnectPro.Enums;
 using ConnectPro.Models;
+using ConnectPro.Models.Responses;
 using Newtonsoft.Json;
 using SharedComponents.Models.GPIO;
 using System;
@@ -228,73 +229,52 @@ public sealed class RestGpioTransport : IGpioTransport
     /// <summary>
     /// Sets a GPO output state via REST API.
     /// </summary>
-    public async Task SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
+    public async Task<ObjectResponse> SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(dirno))
             throw new ArgumentException("dirno must be provided.", nameof(dirno));
 
         if (ct.IsCancellationRequested)
-            return;
+            throw new OperationCanceledException(ct);
+
+        string id = gpoId;
+
+        var requestBody = new
+        {
+            id = id,
+            operation = active ? "set" : "clear",
+            time = timeSeconds ?? 0
+        };
+
+        var endpoint = $"/api/devices/device;dirno={dirno}/gpos";
 
         try
         {
-            // Use gpoId directly (e.g., "relay1", "gpio2")
-            string id = gpoId;
+            System.Diagnostics.Debug.WriteLine($"RestGpioTransport.SetGpoAsync() - Trying endpoint: {endpoint}");
 
-            // Build the request body
-            var requestBody = new
+            string response = await _core.Rest.PostAsync(endpoint, requestBody, ct).ConfigureAwait(false);
+
+            return new ObjectResponse
             {
-                id = id,
-                operation = active ? "set" : "clear",
-                time = timeSeconds ?? 0
+                Success = true,
+                Message = $"REST request succeeded on {endpoint}",
+                Data = response
             };
-
-            // Try different endpoint formats - device;{dirno} with dirno query parameter
-            var endpoint = $"/api/devices/device;dirno={dirno}/gpos";                           // Format 4: Simple gpos with dirno query param
-
-
-            Exception lastException = null;
-
-            try
-            {
-                System.Diagnostics.Debug.WriteLine($"RestGpioTransport.SetGpoAsync() - Trying endpoint: {endpoint}");
-
-                await _core.Rest.PostAsync(endpoint, requestBody, ct).ConfigureAwait(false);
-
-                System.Diagnostics.Debug.WriteLine($"✓ SetGPO succeeded on: {endpoint}");
-                return;  // Success
-            }
-            catch (System.Net.WebException ex) when (ex.Response is System.Net.HttpWebResponse response && (int)response.StatusCode == 404)
-            {
-                System.Diagnostics.Debug.WriteLine($"✗ Not Found: {endpoint}");
-                lastException = ex;
-            }
-            catch (System.Net.WebException ex) when (ex.Response is System.Net.HttpWebResponse response && (int)response.StatusCode == 403)
-            {
-                System.Diagnostics.Debug.WriteLine($"✗ Forbidden: {endpoint}");
-                lastException = ex;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"✗ Error on {endpoint}: {ex.Message}");
-                lastException = ex;
-            }
-
-
-            if (lastException != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"RestGpioTransport.SetGpoAsync() - Failed on all endpoint formats");
-                System.Diagnostics.Debug.WriteLine($"Last error: {lastException.Message}");
-            }
         }
         catch (OperationCanceledException)
         {
-            // Cancelled by caller - safe to return
+            throw;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error setting GPO for {dirno}: {ex.Message}");
-            // Don't throw - allow graceful degradation
+
+            return new ObjectResponse
+            {
+                Success = false,
+                Message = ex.Message,
+                Data = null
+            };
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -93,6 +94,11 @@ public partial class LogViewerViewModel : ObservableObject, IDisposable
     private void Clear()
     {
         LogEntries.Clear();
+    }
+
+    public string GetLogText()
+    {
+        return string.Join(Environment.NewLine, LogEntries.Select(entry => $"{entry.FormattedTimestamp} {entry.Message}"));
     }
 
     public void Dispose()

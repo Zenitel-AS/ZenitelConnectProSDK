@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
 using WampSharp.V2.Core.Contracts;
@@ -24,6 +25,11 @@ namespace Wamp.Client
         /// </summary>
         public async void TraceCallLegEvent()
         {
+            await TraceCallLegEventAsync().ConfigureAwait(false);
+        }
+
+        internal async Task TraceCallLegEventAsync()
+        {
             try
             {
                 lock (_traceCallLegEventGate)
@@ -37,6 +43,9 @@ namespace Wamp.Client
                     OnChildLogString?.Invoke(this, "TraceCallLegEvent skipped. WAMP realm proxy is not available.");
                     return;
                 }
+
+                OnChildLogString?.Invoke(this,
+                    "TraceCallLegEvent starting subscription on current realm. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
 
                 IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceWampCallLeg);
 
@@ -60,6 +69,9 @@ namespace Wamp.Client
 
                     tracerCallLegEvent = tracer;
                     tracerCallLegEventDisposable = subscription;
+
+                    OnChildLogString?.Invoke(this,
+                        "TraceCallLegEvent subscription established. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
                 }
             }
             catch (Exception ex)

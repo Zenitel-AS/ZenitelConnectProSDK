@@ -1,5 +1,7 @@
 ﻿using ConnectPro.Enums;
 using ConnectPro.Models;
+using ConnectPro.Models.Responses;
+using Newtonsoft.Json;
 using SharedComponents.Models.GPIO;
 using System;
 using System.Collections.Concurrent;
@@ -69,7 +71,7 @@ public sealed class WampGpioTransport : IGpioTransport, IDisposable
     /// <param name="timeSeconds">An optional duration, in seconds, for the output action.</param>
     /// <param name="ct">The cancellation token used to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    public Task SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
+    public Task<ObjectResponse> SetGpoAsync(string dirno, string gpoId, bool active, int? timeSeconds, CancellationToken ct)
     {
         ThrowIfDisposed();
 
@@ -80,13 +82,21 @@ public sealed class WampGpioTransport : IGpioTransport, IDisposable
             throw new ArgumentException("gpoId must be provided.", "gpoId");
 
         if (ct.IsCancellationRequested)
-            return Task.FromCanceled(ct);
+            return Task.FromCanceled<ObjectResponse>(ct);
 
         string operation = active ? "set" : "clear";
         int time = timeSeconds ?? 0;
 
-        _client.PostDeviceGPO(dirno, gpoId, operation, time);
-        return Task.CompletedTask;
+        wamp_response response = _client.PostDeviceGPO(dirno, gpoId, operation, time);
+
+        var objectResponse = new ObjectResponse
+        {
+            Success = response != null && response.WampResponse == Wamp.Client.WampClient.ResponseType.WampRequestSucceeded,
+            Message = response != null ? "WAMP PostDeviceGPO request succeeded" : "WAMP PostDeviceGPO request failed",
+            Data = response != null ? JsonConvert.SerializeObject(response) : null
+        };
+
+        return Task.FromResult(objectResponse);
     }
 
     /// <summary>

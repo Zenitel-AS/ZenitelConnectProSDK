@@ -1,80 +1,121 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Wamp.Client
 {
     public partial class WampClient
     {
-        private readonly object _calleeRegistrationGate = new object();
+        private readonly SemaphoreSlim _calleeRegistrationGate = new SemaphoreSlim(1, 1);
         private IAsyncDisposable _calleeRegistrationDisposable;
+        private object _calleeRegistrationRealmProxy;
+        private long _calleeRegistrationGeneration;
 
         /// <summary>
         /// Registers the SDK's callee services against the active WAMP realm so server-side calls can be handled.
         /// </summary>
-        /// <returns>A task that represents the asynchronous registration operation.</returns>
         public async Task RegisterCalleeServices()
         {
             try
             {
-                OnChildLogString?.Invoke(this, "RegisterCalleeServices() invoked.");
+                OnChildLogString?.Invoke(this, "RegisterCalleeServices() invoked. " + GetConnectionDebugState());
 
-                if (_wampRealmProxy == null || _wampRealmProxy.Services == null)
+                if (!TryGetActiveRealmProxy(out var realmProxy, out var generation))
                 {
                     OnChildLogString?.Invoke(this, "RegisterCalleeServices skipped. WAMP realm proxy is not available.");
                     return;
                 }
 
-                lock (_calleeRegistrationGate)
+                OnChildLogString?.Invoke(this,
+                    $"RegisterCalleeServices acquired active realm proxy. Generation={generation}, RealmProxyHash={realmProxy.GetHashCode()}, ServicesReady={realmProxy.Services != null}. " + GetConnectionDebugState());
+
+                if (realmProxy == null || realmProxy.Services == null)
                 {
-                    if (_calleeRegistrationDisposable != null)
-                    {
-                        OnChildLogString?.Invoke(this, "RegisterCalleeServices skipped. Services are already registered.");
-                        return;
-                    }
+                    OnChildLogString?.Invoke(this, "RegisterCalleeServices skipped. WAMP realm proxy is not available.");
+                    return;
                 }
 
-                IArgumentsService instance = new ArgumentsService();
-                IAsyncDisposable registration = await _wampRealmProxy.Services.RegisterCallee(instance);
+                await _calleeRegistrationGate.WaitAsync().ConfigureAwait(false);
 
-                lock (_calleeRegistrationGate)
+                try
                 {
-                    if (_calleeRegistrationDisposable != null)
+                    if (_calleeRegistrationDisposable != null &&
+                        ReferenceEquals(_calleeRegistrationRealmProxy, realmProxy) &&
+                        _calleeRegistrationGeneration == generation)
                     {
-                        registration.DisposeAsync();
+                        OnChildLogString?.Invoke(this, $"RegisterCalleeServices skipped. Services already registered for Generation={generation}, RealmProxyHash={realmProxy.GetHashCode()}.");
                         return;
                     }
 
-                    _calleeRegistrationDisposable = registration;
-                }
+                    if (_calleeRegistrationDisposable != null)
+                    {
+                        OnChildLogString?.Invoke(this, $"Disposing stale callee services registration before re-registering. ExistingGeneration={_calleeRegistrationGeneration}, NewGeneration={generation}.");
 
-                OnChildLogString?.Invoke(this, "RegisterCalleeServices() completed successfully.");
+                        await _calleeRegistrationDisposable.DisposeAsync().ConfigureAwait(false);
+
+                        _calleeRegistrationDisposable = null;
+                        _calleeRegistrationRealmProxy = null;
+                    }
+
+                    IArgumentsService instance = new ArgumentsService();
+
+                    _calleeRegistrationDisposable =
+                        await realmProxy.Services.RegisterCallee(instance).ConfigureAwait(false);
+
+                    _calleeRegistrationRealmProxy = realmProxy;
+                    _calleeRegistrationGeneration = generation;
+
+                    OnChildLogString?.Invoke(this, $"RegisterCalleeServices() completed successfully. Generation={generation}, RealmProxyHash={realmProxy.GetHashCode()}.");
+                }
+                finally
+                {
+                    _calleeRegistrationGate.Release();
+                }
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception in RegisterCalleeServices: " + ex);
+                OnChildLogString?.Invoke(this, "Exception in RegisterCalleeServices: " + ex + ". " + GetConnectionDebugState());
             }
         }
 
-        private void RegisterCalleeServicesDispose()
+        private async Task RegisterCalleeServicesDisposeAsync()
         {
-            IAsyncDisposable registration = null;
-
-            lock (_calleeRegistrationGate)
-            {
-                registration = _calleeRegistrationDisposable;
-                _calleeRegistrationDisposable = null;
-            }
-
-            if (registration == null)
-                return;
-
             try
             {
-                registration.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                var activeGeneration = CaptureActiveChannelContext()?.Generation ?? 0;
+
+                OnChildLogString?.Invoke(this,
+                    $"RegisterCalleeServicesDisposeAsync invoked. ActiveGeneration={activeGeneration}, RegisteredGeneration={_calleeRegistrationGeneration}. " + GetConnectionDebugState());
+
+                await _calleeRegistrationGate.WaitAsync().ConfigureAwait(false);
+
+                try
+                {
+                    if (_calleeRegistrationDisposable == null)
+                        return;
+
+                    if (activeGeneration != 0 && _calleeRegistrationGeneration == activeGeneration)
+                    {
+                        OnChildLogString?.Invoke(this, $"Skipping callee registration dispose for the active WAMP generation {activeGeneration}.");
+                        return;
+                    }
+
+                    await _calleeRegistrationDisposable.DisposeAsync().ConfigureAwait(false);
+
+                    _calleeRegistrationDisposable = null;
+                    _calleeRegistrationRealmProxy = null;
+                    _calleeRegistrationGeneration = 0;
+
+                    OnChildLogString?.Invoke(this, $"Callee services registration disposed. DisposedGeneration={_calleeRegistrationGeneration}, ActiveGeneration={activeGeneration}.");
+                }
+                finally
+                {
+                    _calleeRegistrationGate.Release();
+                }
             }
             catch (Exception ex)
             {
-                OnChildLogString?.Invoke(this, "Exception disposing callee services registration: " + ex);
+                OnChildLogString?.Invoke(this, "Exception disposing callee services registration: " + ex + ". " + GetConnectionDebugState());
             }
         }
     }

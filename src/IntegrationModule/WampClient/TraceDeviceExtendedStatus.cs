@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using WampSharp.Core.Serialization;
 using WampSharp.V2.Client;
 using WampSharp.V2.Core.Contracts;
@@ -25,6 +26,11 @@ namespace Wamp.Client
         /// </summary>
         public async void TraceDeviceExtendedStatusEvent()
         {
+            await TraceDeviceExtendedStatusEventAsync().ConfigureAwait(false);
+        }
+
+        internal async Task TraceDeviceExtendedStatusEventAsync()
+        {
             try
             {
                 lock (_traceDeviceExtendedStatusEventGate)
@@ -38,6 +44,9 @@ namespace Wamp.Client
                     OnChildLogString?.Invoke(this, "TraceDeviceExtendedStatusEvent skipped. WAMP realm proxy is not available.");
                     return;
                 }
+
+                OnChildLogString?.Invoke(this,
+                    "TraceDeviceExtendedStatusEvent starting subscription on current realm. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
 
                 IWampTopicProxy topicProxy = _wampRealmProxy.TopicContainer.GetTopicByUri(TraceDeviceExtendedStatus);
 
@@ -61,6 +70,9 @@ namespace Wamp.Client
 
                     tracerDeviceExtendedStatusEvent = tracer;
                     tracerDeviceExtendedStatusEventDisposable = subscription;
+
+                    OnChildLogString?.Invoke(this,
+                        "TraceDeviceExtendedStatusEvent subscription established. " + GetConnectionDebugStateForRealm(_wampRealmProxy));
                 }
             }
             catch (Exception ex)

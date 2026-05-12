@@ -35,11 +35,6 @@ namespace ConnectPro.Handlers
         private bool _gpioListenersAttached = false;
         private int _initialDeviceSyncCompleted = 0;
 
-        /// <summary>
-        /// Timer to periodically retrieve registered devices.
-        /// </summary>
-        private Timer DeviceRetrievalTimer { get; set; }
-
         #endregion
 
         #region Properties
@@ -88,8 +83,6 @@ namespace ConnectPro.Handlers
             _events.OnDeviceRetrievalStart += HandleDeviceRetrievalStartEvent;
             _events.OnDeviceStateChange += HandleDeviceStateChange;
             _events.OnDeviceRetrievalEnd += AttachGPIOListeners;
-
-            InitializeDeviceRetrievalTimer();
         }
 
         #endregion
@@ -168,16 +161,7 @@ namespace ConnectPro.Handlers
         /// </summary>
         private void HandleDeviceRetrievalStartEvent(object sender, EventArgs e)
         {
-            StartDeviceRetrievalTimer();
-            Task.Run(async () => await RetrieveRegisteredDevices().ConfigureAwait(false));
-        }
-
-        private void OnDeviceRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            if (!_wamp.IsConnected)
-                return;
-
-            Task.Run(async () => await RetrieveRegisteredDevices().ConfigureAwait(false));
+            RetrieveRegisteredDevices();
         }
 
         /// <summary>
@@ -320,27 +304,29 @@ namespace ConnectPro.Handlers
         /// <summary>
         /// Retrieves the list of registered devices from the WAMP client and updates the collections.
         /// </summary>
-        public async Task RetrieveRegisteredDevices()
+        /// <summary>
+        /// Retrieves the list of registered devices from the WAMP client and updates the collections.
+        /// </summary>
+        public void RetrieveRegisteredDevices()
         {
             bool retrievalSucceeded = false;
+            bool shouldSyncQueuesAndCalls = false;
 
             try
             {
                 lock (_lockObj)
                 {
                     if (IsExecutingDeviceRetrieval)
-                    {
-                        // end event outside lock later if you insist, but don’t spam
                         return;
-                    }
+
                     IsExecutingDeviceRetrieval = true;
                 }
 
                 if (!_wamp.IsConnected)
                     return;
 
-                // Snapshot from SDK (raw elements)
-                var elements = _wamp.requestRegisteredDevices() ?? new List<WampClient.wamp_device_registration_element>();
+                var elements = _wamp.requestRegisteredDevices()
+                    ?? new List<WampClient.wamp_device_registration_element>();
 
                 bool listChanged = false;
                 var addedDevices = new List<Device>();
@@ -349,28 +335,25 @@ namespace ConnectPro.Handlers
                 lock (_lockObj)
                 {
                     if (_collections.RegisteredDevices == null)
-                    {
                         _collections.RegisteredDevices = new List<Device>();
-                    }
 
-                    // index existing by IP (stable key in your code)
                     var existingByIp = _collections.RegisteredDevices
                         .Where(d => !string.IsNullOrEmpty(d.device_ip))
                         .ToDictionary(d => d.device_ip, StringComparer.OrdinalIgnoreCase);
 
-                    // mark seen
                     var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                     foreach (var ele in elements)
                     {
-                        if (ele?.device_ip == null) continue;
+                        if (ele?.device_ip == null)
+                            continue;
 
                         seen.Add(ele.device_ip);
 
                         if (existingByIp.TryGetValue(ele.device_ip, out var existing))
                         {
-                            var hasChanges = HasDeviceChanged(existing, ele);
-                            var oldDirno = existing.dirno;
+                            bool hasChanges = HasDeviceChanged(existing, ele);
+                            string oldDirno = existing.dirno;
 
                             existing.SetValuesFromSDK(ele);
 
@@ -386,43 +369,40 @@ namespace ConnectPro.Handlers
                         }
                         else
                         {
-                            var d = new Device(ele, _gpioTransport);
-                            _collections.RegisteredDevices.Add(d);
-                            addedDevices.Add(d);
+                            var device = new Device(ele, _gpioTransport);
+                            _collections.RegisteredDevices.Add(device);
+                            addedDevices.Add(device);
                             listChanged = true;
                         }
                     }
 
-                    // removals
                     for (int i = _collections.RegisteredDevices.Count - 1; i >= 0; i--)
                     {
-                        var d = _collections.RegisteredDevices[i];
-                        if (d?.device_ip == null) continue;
+                        var device = _collections.RegisteredDevices[i];
 
-                        if (!seen.Contains(d.device_ip))
+                        if (device?.device_ip == null)
+                            continue;
+
+                        if (!seen.Contains(device.device_ip))
                         {
-                            DetachGpio(d);
+                            DetachGpio(device);
                             _collections.RegisteredDevices.RemoveAt(i);
-                            removedDevices.Add(d);
+                            removedDevices.Add(device);
                             listChanged = true;
                         }
                     }
 
-                    // keep your existing behavior
+                    shouldSyncQueuesAndCalls = true;
+                }
+
+                if (shouldSyncQueuesAndCalls)
                     _events.OnQueuesAndCallsSync?.Invoke(this, EventArgs.Empty);
-                }
 
-                if (addedDevices.Count > 0)
-                {
-                    foreach (var device in addedDevices)
-                        _events.OnDeviceAdded?.Invoke(this, device);
-                }
+                foreach (var device in addedDevices)
+                    _events.OnDeviceAdded?.Invoke(this, device);
 
-                if (removedDevices.Count > 0)
-                {
-                    foreach (var device in removedDevices)
-                        _events.OnDeviceRemoved?.Invoke(this, device);
-                }
+                foreach (var device in removedDevices)
+                    _events.OnDeviceRemoved?.Invoke(this, device);
 
                 if (listChanged)
                     _events.OnDeviceListChange?.Invoke(this, EventArgs.Empty);
@@ -437,7 +417,9 @@ namespace ConnectPro.Handlers
             finally
             {
                 lock (_lockObj)
+                {
                     IsExecutingDeviceRetrieval = false;
+                }
 
                 if (retrievalSucceeded &&
                     Interlocked.CompareExchange(ref _initialDeviceSyncCompleted, 1, 0) == 0)
@@ -596,31 +578,6 @@ namespace ConnectPro.Handlers
             return existing.DeviceState.HasValue;
         }
 
-        private void InitializeDeviceRetrievalTimer()
-        {
-            if (DeviceRetrievalTimer != null)
-                return;
-
-            DeviceRetrievalTimer = new Timer(DeviceReconcileIntervalMs);
-            DeviceRetrievalTimer.AutoReset = true;
-            DeviceRetrievalTimer.Elapsed += OnDeviceRetrievalTimerElapsed;
-        }
-
-        private void StartDeviceRetrievalTimer()
-        {
-            if (DeviceRetrievalTimer == null)
-                InitializeDeviceRetrievalTimer();
-
-            if (DeviceRetrievalTimer != null && !DeviceRetrievalTimer.Enabled)
-                DeviceRetrievalTimer.Start();
-        }
-
-        private void StopDeviceRetrievalTimer()
-        {
-            if (DeviceRetrievalTimer != null && DeviceRetrievalTimer.Enabled)
-                DeviceRetrievalTimer.Stop();
-        }
-
         private void DetachGpio(Device device)
         {
             if (device == null)
@@ -701,15 +658,6 @@ namespace ConnectPro.Handlers
                     _wamp.OnWampDeviceExtendedStatusEvent -= HandleDeviceExtendedStatus;
                     _wamp.OnWampDeviceGPIStatusEventEx -= HandleDeviceGPIOStatusEvent;
                     _wamp.OnWampDeviceGPOStatusEventEx -= HandleDeviceGPIOStatusEvent;
-                }
-
-                // Dispose timer
-                if (DeviceRetrievalTimer != null)
-                {
-                    StopDeviceRetrievalTimer();
-                    DeviceRetrievalTimer.Elapsed -= OnDeviceRetrievalTimerElapsed;
-                    DeviceRetrievalTimer.Dispose();
-                    DeviceRetrievalTimer = null;
                 }
             }
 

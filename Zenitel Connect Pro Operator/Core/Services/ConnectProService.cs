@@ -76,7 +76,7 @@ public sealed class ConnectProService : IConnectProService
         try
         {
             if (!_started) throw new InvalidOperationException("Service not started.");
-            await Core.DeviceHandler.RetrieveRegisteredDevices();
+            Core.DeviceHandler.RetrieveRegisteredDevices();
         }
         finally
         {

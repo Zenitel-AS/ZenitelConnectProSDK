@@ -57,7 +57,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\Operator.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\PrerecordedMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Responses\CallResponse.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\Responses\ObjectResponse.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\AssemblyChecker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Tools\CallStateMapper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\Cryptography.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\ErrorLogger.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tools\IconManager.cs" />
