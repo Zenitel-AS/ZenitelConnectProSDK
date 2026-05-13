@@ -3,9 +3,11 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Wamp.Client;
 using Zenitel.IntegrationModule.REST;
+using Timer = System.Timers.Timer;
 
 namespace ConnectPro.Handlers
 {
@@ -19,6 +21,9 @@ namespace ConnectPro.Handlers
         private WampClient _wamp;
         private RestClient _rest;
         private object _lockObj = new object();
+        private readonly SemaphoreSlim _retrievalGate = new SemaphoreSlim(1, 1);
+        private const double CallForwardingReconcileIntervalMs = 5000;
+        private Timer CallForwardingRetrievalTimer { get; set; }
 
         /// <summary>
         /// Indicates whether call forwarding rule retrieval is currently being executed.
@@ -51,6 +56,7 @@ namespace ConnectPro.Handlers
             ParentIpAddress = parentIpAddress;
 
             _events.OnConnectionChanged += HandleConnectionChange;
+            InitializeCallForwardingRetrievalTimer();
         }
 
         /// <summary>
@@ -64,9 +70,11 @@ namespace ConnectPro.Handlers
             if (isConnected)
             {
                 _events.OnDeviceListChange += HandleDeviceListChange;
+                StartCallForwardingRetrievalTimer();
             }
             else
             {
+                StopCallForwardingRetrievalTimer();
                 _events.OnDeviceListChange -= HandleDeviceListChange;
                 _collections.CallForwardingRules.Clear();
                 _events.OnCallForwardingRulesChange?.Invoke(this, EventArgs.Empty);
@@ -92,69 +100,49 @@ namespace ConnectPro.Handlers
         /// <returns>True if retrieval was successful for at least one device; otherwise false.</returns>
         public async Task<bool> RetrieveCallForwardingRules()
         {
-            lock (_lockObj)
-            {
-                if (IsExecutingRetrieval)
-                    return false;
-                IsExecutingRetrieval = true;
-            }
-
-            bool success = false;
+            if (!TryEnterGate(_retrievalGate))
+                return false;
 
             try
             {
-                var dirnos = _collections.RegisteredDevices
-                    .Select(d => d.dirno)
-                    .Where(d => !string.IsNullOrWhiteSpace(d))
-                    .Distinct()
-                    .ToList();
+                var latestRules = await FetchCallForwardingRulesAsync().ConfigureAwait(false);
 
-                var allRules = new List<CallForwardingRule>();
+                if (latestRules == null)
+                    return false;
 
-                foreach (var dirno in dirnos)
+                bool changed;
+
+                lock (_lockObj)
                 {
-                    try
-                    {
-                        string endpoint = "/api/call_forwarding?dirno=" + Uri.EscapeDataString(dirno);
-                        string response = await _rest.GetAsync(endpoint).ConfigureAwait(false);
+                    var existingRules = _collections.CallForwardingRules?.ToList() ?? new List<CallForwardingRule>();
+                    changed = HaveRulesChanged(existingRules, latestRules);
 
-                        if (!string.IsNullOrEmpty(response))
+                    if (changed)
+                    {
+                        _collections.CallForwardingRules.Clear();
+                        foreach (var rule in latestRules)
                         {
-                            var rules = JsonConvert.DeserializeObject<List<CallForwardingRule>>(response);
-                            if (rules != null)
-                            {
-                                allRules.AddRange(rules);
-                                success = true;
-                            }
+                            _collections.CallForwardingRules.Add(rule);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        _events.OnExceptionThrown?.Invoke(this, ex);
-                    }
                 }
 
-                _collections.CallForwardingRules.Clear();
-                foreach (var rule in allRules)
+                if (changed)
                 {
-                    _collections.CallForwardingRules.Add(rule);
+                    _events.OnCallForwardingRulesChange?.Invoke(this, EventArgs.Empty);
                 }
 
-                _events.OnCallForwardingRulesChange?.Invoke(this, EventArgs.Empty);
+                return latestRules.Count > 0;
             }
             catch (Exception exe)
             {
                 _events.OnExceptionThrown?.Invoke(this, exe);
+                return false;
             }
             finally
             {
-                lock (_lockObj)
-                {
-                    IsExecutingRetrieval = false;
-                }
+                ReleaseGate(_retrievalGate);
             }
-
-            return success;
         }
 
         /// <summary>
@@ -168,12 +156,8 @@ namespace ConnectPro.Handlers
             if (string.IsNullOrWhiteSpace(dirno))
                 return await RetrieveCallForwardingRules();
 
-            lock (_lockObj)
-            {
-                if (IsExecutingRetrieval)
-                    return false;
-                IsExecutingRetrieval = true;
-            }
+            if (!TryEnterGate(_retrievalGate))
+                return false;
 
             bool success = false;
 
@@ -187,25 +171,44 @@ namespace ConnectPro.Handlers
 
                 if (!string.IsNullOrEmpty(response))
                 {
-                    var rules = JsonConvert.DeserializeObject<List<CallForwardingRule>>(response);
+                    var fetchedRules = JsonConvert.DeserializeObject<List<CallForwardingRule>>(response);
 
-                    if (rules != null)
+                    if (fetchedRules != null)
                     {
-                        // Remove existing rules for this dirno/fwdType before adding fresh ones
-                        _collections.CallForwardingRules.RemoveAll(r =>
-                            r.Dirno == dirno &&
-                            (string.IsNullOrEmpty(fwdType) || r.FwdType == fwdType));
+                        bool changed = false;
 
-                        foreach (var rule in rules)
+                        lock (_lockObj)
                         {
-                            _collections.CallForwardingRules.Add(rule);
+                            // Get existing rules for comparison
+                            var affectedExisting = _collections.CallForwardingRules
+                                .Where(r => r.Dirno == dirno &&
+                                           (string.IsNullOrEmpty(fwdType) || r.FwdType == fwdType))
+                                .ToList();
+
+                            changed = HaveRulesChanged(affectedExisting, fetchedRules);
+
+                            if (changed)
+                            {
+                                // Remove existing rules for this dirno/fwdType before adding fresh ones
+                                _collections.CallForwardingRules.RemoveAll(r =>
+                                    r.Dirno == dirno &&
+                                    (string.IsNullOrEmpty(fwdType) || r.FwdType == fwdType));
+
+                                foreach (var rule in fetchedRules)
+                                {
+                                    _collections.CallForwardingRules.Add(rule);
+                                }
+                            }
+                        }
+
+                        if (changed)
+                        {
+                            _events.OnCallForwardingRulesChange?.Invoke(this, EventArgs.Empty);
                         }
 
                         success = true;
                     }
                 }
-
-                _events.OnCallForwardingRulesChange?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception exe)
             {
@@ -213,10 +216,7 @@ namespace ConnectPro.Handlers
             }
             finally
             {
-                lock (_lockObj)
-                {
-                    IsExecutingRetrieval = false;
-                }
+                ReleaseGate(_retrievalGate);
             }
 
             return success;
@@ -311,6 +311,236 @@ namespace ConnectPro.Handlers
                 .ToList();
         }
 
+        #region Timer Management
+
+        private void InitializeCallForwardingRetrievalTimer()
+        {
+            if (CallForwardingRetrievalTimer != null)
+                return;
+
+            CallForwardingRetrievalTimer = new Timer(CallForwardingReconcileIntervalMs);
+            CallForwardingRetrievalTimer.AutoReset = true;
+            CallForwardingRetrievalTimer.Elapsed += OnCallForwardingRetrievalTimerElapsed;
+        }
+
+        private void StartCallForwardingRetrievalTimer()
+        {
+            if (CallForwardingRetrievalTimer != null && !CallForwardingRetrievalTimer.Enabled)
+            {
+                CallForwardingRetrievalTimer.Start();
+            }
+        }
+
+        private void StopCallForwardingRetrievalTimer()
+        {
+            if (CallForwardingRetrievalTimer != null && CallForwardingRetrievalTimer.Enabled)
+            {
+                CallForwardingRetrievalTimer.Stop();
+            }
+        }
+
+        private async void OnCallForwardingRetrievalTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (_disposed || !_wamp.IsConnected)
+                return;
+
+            await ReconcileCallForwardingRules().ConfigureAwait(false);
+        }
+
+        #endregion
+
+        #region Reconciliation Helpers
+
+        private static bool TryEnterGate(SemaphoreSlim gate)
+        {
+            try
+            {
+                return gate.Wait(0);
+            }
+            catch (ObjectDisposedException)
+            {
+                return false;
+            }
+        }
+
+        private static void ReleaseGate(SemaphoreSlim gate)
+        {
+            try
+            {
+                gate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SemaphoreFullException)
+            {
+            }
+        }
+
+        /// <summary>
+        /// Fetches call forwarding rules from the REST API for all registered devices.
+        /// </summary>
+        /// <returns>A list of rules if successful; otherwise null.</returns>
+        private async Task<List<CallForwardingRule>> FetchCallForwardingRulesAsync()
+        {
+            try
+            {
+                var dirnos = _collections.RegisteredDevices
+                    .Select(d => d.dirno)
+                    .Where(d => !string.IsNullOrWhiteSpace(d))
+                    .Distinct()
+                    .ToList();
+
+                if (dirnos.Count == 0)
+                    return new List<CallForwardingRule>();
+
+                var allRules = new List<CallForwardingRule>();
+
+                foreach (var dirno in dirnos)
+                {
+                    try
+                    {
+                        string endpoint = "/api/call_forwarding?dirno=" + Uri.EscapeDataString(dirno);
+                        string response = await _rest.GetAsync(endpoint).ConfigureAwait(false);
+
+                        if (!string.IsNullOrEmpty(response))
+                        {
+                            var rules = JsonConvert.DeserializeObject<List<CallForwardingRule>>(response);
+                            if (rules != null)
+                            {
+                                allRules.AddRange(rules);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _events.OnExceptionThrown?.Invoke(this, ex);
+                    }
+                }
+
+                return allRules;
+            }
+            catch (Exception ex)
+            {
+                _events.OnExceptionThrown?.Invoke(this, ex);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Generates a stable key for a call forwarding rule.
+        /// </summary>
+        private static string GetRuleKey(CallForwardingRule rule)
+        {
+            if (rule == null)
+                return string.Empty;
+
+            return (rule.Dirno ?? string.Empty) + "|" + (rule.FwdType ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Compares two call forwarding rules by their values.
+        /// </summary>
+        private static bool AreRulesEqual(CallForwardingRule rule1, CallForwardingRule rule2)
+        {
+            if (rule1 == null && rule2 == null)
+                return true;
+            if (rule1 == null || rule2 == null)
+                return false;
+
+            return string.Equals(rule1.Dirno, rule2.Dirno, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(rule1.FwdType, rule2.FwdType, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(rule1.FwdTo, rule2.FwdTo, StringComparison.OrdinalIgnoreCase) &&
+                   rule1.Enabled == rule2.Enabled;
+        }
+
+        /// <summary>
+        /// Determines if two lists of call forwarding rules are effectively different.
+        /// </summary>
+        private static bool HaveRulesChanged(List<CallForwardingRule> existingRules, List<CallForwardingRule> latestRules)
+        {
+            if (existingRules == null && latestRules == null)
+                return false;
+            if (existingRules == null || latestRules == null)
+                return true;
+
+            var existingByKey = existingRules
+                .Where(r => r != null)
+                .GroupBy(GetRuleKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            var latestByKey = latestRules
+                .Where(r => r != null)
+                .GroupBy(GetRuleKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            if (existingByKey.Count != latestByKey.Count)
+                return true;
+
+            foreach (var kvp in latestByKey)
+            {
+                if (!existingByKey.TryGetValue(kvp.Key, out var existingRule))
+                    return true;
+
+                if (!AreRulesEqual(existingRule, kvp.Value))
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Periodically fetches call forwarding rules and updates the collection only if changes are detected.
+        /// </summary>
+        private async Task ReconcileCallForwardingRules()
+        {
+            if (_disposed || !TryEnterGate(_retrievalGate))
+                return;
+
+            try
+            {
+                if (!_wamp.IsConnected)
+                    return;
+
+                var latestRules = await FetchCallForwardingRulesAsync().ConfigureAwait(false);
+
+                if (latestRules == null)
+                    return;
+
+                bool changed;
+
+                lock (_lockObj)
+                {
+                    var existingRules = _collections.CallForwardingRules?.ToList() ?? new List<CallForwardingRule>();
+                    changed = HaveRulesChanged(existingRules, latestRules);
+
+                    if (changed)
+                    {
+                        _collections.CallForwardingRules.Clear();
+                        foreach (var rule in latestRules)
+                        {
+                            _collections.CallForwardingRules.Add(rule);
+                        }
+                    }
+                }
+
+                if (changed)
+                {
+                    _events.OnCallForwardingRulesChange?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                _events.OnExceptionThrown?.Invoke(this, ex);
+            }
+            finally
+            {
+                ReleaseGate(_retrievalGate);
+            }
+        }
+
+        #endregion
+
         #region IDisposable Implementation
 
         private bool _disposed = false;
@@ -335,11 +565,22 @@ namespace ConnectPro.Handlers
 
             if (disposing)
             {
+                StopCallForwardingRetrievalTimer();
+
+                if (CallForwardingRetrievalTimer != null)
+                {
+                    CallForwardingRetrievalTimer.Elapsed -= OnCallForwardingRetrievalTimerElapsed;
+                    CallForwardingRetrievalTimer.Dispose();
+                    CallForwardingRetrievalTimer = null;
+                }
+
                 if (_events != null)
                 {
                     _events.OnConnectionChanged -= HandleConnectionChange;
                     _events.OnDeviceListChange -= HandleDeviceListChange;
                 }
+
+                _retrievalGate?.Dispose();
             }
 
             _disposed = true;
