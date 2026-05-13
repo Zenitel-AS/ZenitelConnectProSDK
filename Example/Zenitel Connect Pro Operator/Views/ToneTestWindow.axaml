@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+        x:Class="ZenitelConnectProOperator.Views.ToneTestWindow"
+        x:DataType="vm:ToneTestWindowViewModel"
+        xmlns:views="clr-namespace:ZenitelConnectProOperator.Views"
+        mc:Ignorable="d"
+        Width="900"
+        MinWidth="820"
+        Height="640"
+        MinHeight="560"
+        Title="Tone Test">
+
+  <Design.DataContext>
+    <vm:ToneTestWindowViewModel />
+  </Design.DataContext>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16">
+
+    <!-- Header -->
+    <StackPanel>
+      <TextBlock Text="Tone Test" FontSize="18" FontWeight="SemiBold"/>
+      <TextBlock Text="{Binding SummaryText}" Opacity="0.75"/>
+    </StackPanel>
+
+    <!-- Controls -->
+    <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1">
+      <Grid ColumnDefinitions="*,220,220,Auto" RowDefinitions="Auto" VerticalAlignment="Center">
+        <TextBox Grid.Column="0"
+                 Watermark="Search by DIRNO or Name…"
+                 Text="{Binding SearchQuery}"/>
+
+        <ComboBox Grid.Column="1"
+                  ItemsSource="{Binding StatusOptions}"
+                  SelectedItem="{Binding SelectedStatus}"/>
+
+        <ComboBox Grid.Column="2"
+                  ItemsSource="{Binding TestOptions}"
+                  SelectedItem="{Binding SelectedTestOption}"/>
+
+        <Button Grid.Column="3"
+                Content="Run"
+                Command="{Binding RunSelectedTestCommand}"
+                IsEnabled="{Binding CanRun}"/>
+      </Grid>
+    </Border>
+
+    <!-- Table -->
+    <Border Grid.Row="2" Padding="12" CornerRadius="8" BorderThickness="1">
+      <DataGrid ItemsSource="{Binding FilteredDevices}"
+                AutoGenerateColumns="False"
+                IsReadOnly="False"
+                GridLinesVisibility="All"
+                HeadersVisibility="All">
+
+        <DataGrid.Columns>
+
+          <!-- Select (checkbox) -->
+          <DataGridTemplateColumn Width="70">
+            <DataGridTemplateColumn.HeaderTemplate>
+              <DataTemplate>
+                <CheckBox IsChecked="{Binding SelectAll, RelativeSource={RelativeSource AncestorType=views:ToneTestWindow}}"/>
+              </DataTemplate>
+            </DataGridTemplateColumn.HeaderTemplate>
+
+
+
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <CheckBox IsChecked="{Binding IsChecked}"/>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+          <DataGridTextColumn Header="DIRNO" Binding="{Binding Dirno}" Width="120"/>
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+
+          <DataGridTextColumn Header="Status"
+                              Binding="{Binding CurrentStatus}"
+                              Width="140"/>
+
+          <DataGridTextColumn Header="Last Pass"
+                              Binding="{Binding LastPass}"
+                              Width="160"/>
+
+          <DataGridTextColumn Header="Last Fail"
+                              Binding="{Binding LastFail}"
+                              Width="160"/>
+
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Footer -->
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Close" Command="{Binding CloseCommand}"/>
+    </StackPanel>
+  </Grid>
+</Window>

@@ -11,5 +11,10 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Zenitel Connect Pro Operator\Zenitel Connect Pro Operator.csproj" />
   </ItemGroup>
 </Project>

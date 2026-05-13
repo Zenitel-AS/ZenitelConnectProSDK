@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ZenitelConnectProOperator.ViewModels"
+        x:Class="ZenitelConnectProOperator.Views.GroupCallPopupWindow"
+        x:DataType="vm:GroupCallPopupViewModel"
+        mc:Ignorable="d"
+        Width="360"
+        Height="180"
+        CanResize="False"
+        Title="Group Call">
+
+  <Grid Margin="16" RowDefinitions="Auto,Auto,*">
+    <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="SemiBold"/>
+    <TextBlock Grid.Row="1" Text="{Binding DirNo}" Opacity="0.75"/>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="{Binding MuteButtonText}" Command="{Binding ToggleMuteCommand}"/>
+      <Button Content="End" Command="{Binding EndCallCommand}"/>
+    </StackPanel>
+  </Grid>
+</Window>

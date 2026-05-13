@@ -9,8 +9,4 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.iOS" Version="$(AvaloniaVersion)" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Example\Zenitel Connect Pro Operator\Zenitel Connect Pro Operator.csproj" />
-  </ItemGroup>
 </Project>
