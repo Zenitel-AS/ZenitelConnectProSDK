@@ -183,13 +183,6 @@ namespace ConnectPro
             {
                 _events.OnExceptionThrown?.Invoke(this, exe);
             }
-            finally
-            {
-                if (!this.IsConnected)
-                {
-                    _events.OnConnectionChanged?.Invoke(this, false);
-                }
-            }
         }
         
         /// <summary>
@@ -347,17 +340,19 @@ namespace ConnectPro
 
                 cancellationToken.ThrowIfCancellationRequested();
 
+                await Task.Delay(WarmupStepDelay, cancellationToken).ConfigureAwait(false);
+
+                LogConnectionDebug($"Post-connect warm-up signaling stable connected state. Generation={generation}");
+                _events.OnConnectionChanged?.Invoke(this, true);
+
+                await Task.Delay(WarmupStepDelay, cancellationToken).ConfigureAwait(false);
+
                 if (!_postConnectRetrievalTriggered)
                 {
                     _postConnectRetrievalTriggered = true;
                     LogConnectionDebug($"Post-connect warm-up triggering initial device retrieval. Generation={generation}");
                     _events.OnDeviceRetrievalStart?.Invoke(this, EventArgs.Empty);
                 }
-
-                await Task.Delay(WarmupStepDelay, cancellationToken).ConfigureAwait(false);
-
-                LogConnectionDebug($"Post-connect warm-up signaling stable connected state. Generation={generation}");
-                _events.OnConnectionChanged?.Invoke(this, true);
 
                 LogConnectionDebug($"Post-connect warm-up completed. Generation={generation}");
             }

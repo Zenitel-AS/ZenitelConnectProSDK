@@ -2,9 +2,12 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ConnectPro.Models;
+using ConnectPro.Tools;
 using ZenitelConnectProOperator.Core.Abstractions;
 
 namespace ZenitelConnectProOperator.ViewModels;
@@ -26,7 +29,9 @@ public partial class ConfigurationViewModel : ObservableObject
     [ObservableProperty] private string password = "";
 
     [ObservableProperty] private bool isBusy;
-    [ObservableProperty] private string connectionStatusText = "Not Connected!";
+    [ObservableProperty] private string connectedSystemText = "-";
+    [ObservableProperty] private string connectionStatusText = "Disconnected";
+    [ObservableProperty] private IBrush connectionStatusBrush = Brushes.Red;
 
     public ObservableCollection<OperatorOption> OperatorOptions { get; } =
         new()
@@ -51,11 +56,34 @@ public partial class ConfigurationViewModel : ObservableObject
         // Wire service events to update UI
         _connectPro.Core.Events.OnConnectionChanged += OnConnectionChanged;
         _connectPro.Core.Events.OnOperatorDirNoChange += OnOperatorDirNoChanged;
-        _connectPro.Core.Events.OnDeviceRetrievalEnd += (_, _) =>
+        _connectPro.Core.Events.OnDeviceRetrievalStart += OnDeviceRetrievalStart;
+        _connectPro.Core.Events.OnDeviceRetrievalEnd += OnDeviceRetrievalEnd;
+        _connectPro.Core.Events.OnExceptionThrown += OnExceptionThrown;
+
+        ApplyInitialState();
+    }
+
+    partial void OnIsBusyChanged(bool value)
+        => OnPropertyChanged(nameof(CanConnect));
+
+    private void ApplyInitialState()
+    {
+        var handler = _connectPro.Core.ConnectionHandler;
+
+        if (handler?.IsConnected == true)
         {
-            // Refresh operator list when device retrieval ends
+            SetStatus("Connected", Brushes.LightGray, false, _connectPro.Core.Configuration.ServerAddr);
             RefreshOperatorList();
-        };
+            return;
+        }
+
+        if (handler?.IsReconnecting == true)
+        {
+            SetStatus("Connecting...", Brushes.Gold, true, _connectPro.Core.Configuration.ServerAddr);
+            return;
+        }
+
+        SetStatus("Disconnected", Brushes.Red, false, "-");
     }
 
     private void LoadSavedConfiguration()
@@ -70,7 +98,7 @@ public partial class ConfigurationViewModel : ObservableObject
             Port = saved.Port ?? "8086";
             Realm = saved.Realm ?? "";
             UserName = saved.UserName ?? "";
-            Password = saved.Password ?? "";
+            Password = Cryptography.Decrypt(saved.Password ?? "");
 
             // Keep this and apply it when we have options to match against.
             _loadedOperatorDirNo = saved.OperatorDirNo;
@@ -90,18 +118,70 @@ public partial class ConfigurationViewModel : ObservableObject
             Port = Port,
             Realm = Realm,
             UserName = UserName,
-            Password = Password, // TODO: encrypt
+            Password = Cryptography.Encrypt(Password),
             OperatorDirNo = SelectedOperator?.DirNo
         };
 
         _configStore.SaveConfiguration(config);
     }
 
+    private void SetStatus(string status, IBrush brush, bool busy, string? connectedSystem = null)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            ConnectionStatusText = status;
+            ConnectionStatusBrush = brush;
+            IsBusy = busy;
+
+            if (connectedSystem is not null)
+            {
+                ConnectedSystemText = string.IsNullOrWhiteSpace(connectedSystem) ? "-" : connectedSystem;
+            }
+        });
+    }
+
     private void OnConnectionChanged(object? sender, bool isConnected)
     {
-        ConnectionStatusText = isConnected
-            ? $"Connected to {_connectPro.Core.Configuration.ServerAddr}"
-            : "Not Connected!";
+        if (isConnected)
+        {
+            SetStatus(
+                "Connected - synchronizing devices...",
+                Brushes.Gold,
+                true,
+                _connectPro.Core.Configuration.ServerAddr);
+        }
+        else
+        {
+            SetStatus("Disconnected", Brushes.Red, false, "-");
+        }
+    }
+
+    private void OnDeviceRetrievalStart(object? sender, EventArgs e)
+    {
+        SetStatus(
+            "Connecting - retrieving devices...",
+            Brushes.Gold,
+            true,
+            _connectPro.Core.Configuration.ServerAddr);
+    }
+
+    private void OnDeviceRetrievalEnd(object? sender, EventArgs e)
+    {
+        RefreshOperatorList();
+
+        if (_connectPro.Core.ConnectionHandler?.IsConnected == true)
+        {
+            SetStatus(
+                "Connected",
+                Brushes.LightGray,
+                false,
+                _connectPro.Core.Configuration.ServerAddr);
+        }
+    }
+
+    private void OnExceptionThrown(object? sender, Exception ex)
+    {
+        SetStatus($"Error: {ex.Message}", Brushes.OrangeRed, false, "-");
     }
 
     private void OnOperatorDirNoChanged(object? sender, string dirNo)
@@ -200,10 +280,7 @@ public partial class ConfigurationViewModel : ObservableObject
     {
         try
         {
-            IsBusy = true;
-            OnPropertyChanged(nameof(CanConnect));
-
-            ConnectionStatusText = $"Connecting to {ServerAddr}:{Port}...";
+            SetStatus($"Connecting to {ServerAddr}:{Port}...", Brushes.Gold, true, ServerAddr);
 
             // Persist current config (includes selected operator)
             SaveCurrentConfiguration();
@@ -220,27 +297,16 @@ public partial class ConfigurationViewModel : ObservableObject
                 OperatorDirNo = SelectedOperator?.DirNo
             };
 
+            _connectPro.Core.Configuration = config;
             _connectPro.Core.Events.OnConfigurationChanged?.Invoke(this, config);
 
             // Reconnect SDK with new configuration
             await _connectPro.Core.ConnectionHandler.RecoonectAsync();
-
-            // Refresh operator list from SDK
-            RefreshOperatorList();
-
-            ConnectionStatusText = _connectPro.Core.ConnectionHandler.IsConnected
-                ? $"Connected to {ServerAddr}:{Port}"
-                : "Connection failed - check credentials";
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Connection failed: {ex.Message}");
-            ConnectionStatusText = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            IsBusy = false;
-            OnPropertyChanged(nameof(CanConnect));
+            SetStatus($"Error: {ex.Message}", Brushes.OrangeRed, false, "-");
         }
     }
 

@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ConnectPro.Tools;
 using ZenitelConnectProOperator.Core.Abstractions;
 
 namespace ZenitelConnectProOperator.Core.Services;
@@ -9,6 +10,7 @@ namespace ZenitelConnectProOperator.Core.Services;
 public sealed class ConnectProService : IConnectProService
 {
     private readonly ILogger<ConnectProService> _log;
+    private readonly IConfigStore _configStore;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private bool _started;
@@ -16,9 +18,10 @@ public sealed class ConnectProService : IConnectProService
 
     public ConnectPro.Core Core { get; private set; } = null!;
 
-    public ConnectProService(ILogger<ConnectProService> log)
+    public ConnectProService(ILogger<ConnectProService> log, IConfigStore configStore)
     {
         _log = log;
+        _configStore = configStore;
     }
 
     public async Task StartAsync(CancellationToken ct)
@@ -28,7 +31,6 @@ public sealed class ConnectProService : IConnectProService
         {
             if (_started) return;
 
-            // TODO: Replace with config repository (SQLite) + secure password handling.
             var cfg = await LoadConfigurationAsync(ct);
 
             Core = new ConnectPro.Core
@@ -85,18 +87,23 @@ public sealed class ConnectProService : IConnectProService
 
     }
 
-    private static Task<ConnectPro.Configuration> LoadConfigurationAsync(CancellationToken ct)
+    private Task<ConnectPro.Configuration> LoadConfigurationAsync(CancellationToken ct)
     {
-        // Placeholder defaults (same as your original)
-        return Task.FromResult(new ConnectPro.Configuration
-        {
-            ServerAddr = "192.168.1.5",
-            Port = "8086",
-            UserName = "",
-            Password = "",
-            MachineName = Environment.MachineName,
-            Realm = ""
-        });
+        ct.ThrowIfCancellationRequested();
+
+        var defaults = ConnectPro.Configuration.GetDefaultConfiguration();
+        var saved = _configStore.LoadForMachine(Environment.MachineName);
+        var cfg = saved ?? defaults;
+
+        cfg.MachineName = Environment.MachineName;
+        cfg.ServerAddr = string.IsNullOrWhiteSpace(cfg.ServerAddr) ? defaults.ServerAddr : cfg.ServerAddr;
+        cfg.Port = string.IsNullOrWhiteSpace(cfg.Port) ? defaults.Port : cfg.Port;
+        cfg.Realm = string.IsNullOrWhiteSpace(cfg.Realm) ? defaults.Realm : cfg.Realm;
+        cfg.UserName ??= "";
+        cfg.OperatorDirNo ??= "";
+        cfg.Password = Cryptography.Decrypt(cfg.Password ?? "");
+
+        return Task.FromResult(cfg);
     }
 
     public async ValueTask DisposeAsync()

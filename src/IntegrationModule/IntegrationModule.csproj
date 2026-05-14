@@ -23,7 +23,7 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageId>Zenitel.ConnectPro.SDK</PackageId>
-		<Version>1.2.5.5</Version>
+		<Version>1.2.5.6</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -57,8 +57,8 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<!-- Generates .snupkg -->
 		<Deterministic>true</Deterministic>
-		<FileVersion>1.2.5.5</FileVersion>
-		<AssemblyVersion>1.2.5.5</AssemblyVersion>
+		<FileVersion>1.2.5.6</FileVersion>
+		<AssemblyVersion>1.2.5.6</AssemblyVersion>
 		<Title>Zenitel Connect Pro SDK</Title>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<!-- Ensures builds are reproducible -->

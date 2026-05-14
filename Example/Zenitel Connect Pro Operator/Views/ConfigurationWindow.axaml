@@ -8,8 +8,8 @@
         x:DataType="vm:ConfigurationViewModel"
         Width="560"
         MinWidth="520"
-        Height="520"
-        MinHeight="480"
+        Height="560"
+        MinHeight="520"
         Title="Configuration">
 
   <Design.DataContext>
@@ -25,30 +25,30 @@
 
     <!-- Form -->
     <Border Grid.Row="1" Padding="12" CornerRadius="8" BorderThickness="1">
-      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
             ColumnDefinitions="160,*">
 
         <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Server address"/>
-        <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddr}" Watermark="e.g. 10.8.33.5"/>
+        <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding ServerAddr, Mode=TwoWay}" Watermark="e.g. 10.8.33.5"/>
 
         <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Port"/>
-        <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding Port}" Watermark="e.g. 8086"/>
+        <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding Port, Mode=TwoWay}" Watermark="e.g. 8086"/>
 
         <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Realm"/>
-        <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding Realm}" Watermark="e.g. zenitel"/>
+        <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding Realm, Mode=TwoWay}" Watermark="e.g. zenitel"/>
 
         <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Username"/>
-        <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding UserName}"/>
+        <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding UserName, Mode=TwoWay}"/>
 
         <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Password"/>
         <TextBox   Grid.Row="4" Grid.Column="1"
-                   Text="{Binding Password}"
+                   Text="{Binding Password, Mode=TwoWay}"
                    PasswordChar="●"/>
 
         <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Operator DIRNO"/>
         <ComboBox  Grid.Row="5" Grid.Column="1"
                    ItemsSource="{Binding OperatorOptions}"
-                   SelectedItem="{Binding SelectedOperator}">
+                   SelectedItem="{Binding SelectedOperator, Mode=TwoWay}">
           <ComboBox.ItemTemplate>
             <DataTemplate>
               <TextBlock Text="{Binding Display}"/>
@@ -56,12 +56,19 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
 
-        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Connection"/>
+        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Connected system"/>
         <TextBlock Grid.Row="6" Grid.Column="1"
-                   Text="{Binding ConnectionStatusText}"
+                   Text="{Binding ConnectedSystemDisplay}"
                    FontWeight="SemiBold"/>
 
-        <ProgressBar Grid.Row="7" Grid.ColumnSpan="2"
+        <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="Status"/>
+        <TextBlock Grid.Row="7" Grid.Column="1"
+                   Text="{Binding ConnectionStatusText}"
+                   Foreground="{Binding ConnectionStatusDisplayBrush}"
+                   FontWeight="SemiBold"
+                   TextWrapping="Wrap"/>
+
+        <ProgressBar Grid.Row="8" Grid.ColumnSpan="2"
                      IsIndeterminate="{Binding IsBusy}"
                      Height="6"/>
       </Grid>

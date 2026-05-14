@@ -2,15 +2,30 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ConnectPro;
 using ConnectPro.Models;
+using ConnectPro.Tools;
 using ZenitelConnectProOperator.Core.Abstractions;
 
 namespace ZenitelConnectProOperator.ViewModels;
 
 public partial class ConfigurationViewModel : ObservableObject
 {
+    private enum UiConnectionState
+    {
+        Disconnected,
+        Connecting,
+        Connected,
+        ConnectedSynchronizing,
+        Synced,
+        Error
+    }
+    public sealed record OperatorOption(string Display, string? DirNo);
+
     private readonly IConnectProService _connectPro;
     private readonly IConfigStore _configStore;
 
@@ -26,7 +41,21 @@ public partial class ConfigurationViewModel : ObservableObject
     [ObservableProperty] private string password = "";
 
     [ObservableProperty] private bool isBusy;
-    [ObservableProperty] private string connectionStatusText = "Not Connected!";
+    [ObservableProperty] private string connectionStatusText = "Disconnected";
+
+    private string _connectedSystemDisplay = "-";
+    public string ConnectedSystemDisplay
+    {
+        get => _connectedSystemDisplay;
+        set => SetProperty(ref _connectedSystemDisplay, value);
+    }
+
+    private IBrush _connectionStatusDisplayBrush = Brushes.Red;
+    public IBrush ConnectionStatusDisplayBrush
+    {
+        get => _connectionStatusDisplayBrush;
+        set => SetProperty(ref _connectionStatusDisplayBrush, value);
+    }
 
     public ObservableCollection<OperatorOption> OperatorOptions { get; } =
         new()
@@ -51,11 +80,34 @@ public partial class ConfigurationViewModel : ObservableObject
         // Wire service events to update UI
         _connectPro.Core.Events.OnConnectionChanged += OnConnectionChanged;
         _connectPro.Core.Events.OnOperatorDirNoChange += OnOperatorDirNoChanged;
-        _connectPro.Core.Events.OnDeviceRetrievalEnd += (_, _) =>
+        _connectPro.Core.Events.OnDeviceRetrievalEnd += OnDeviceRetrievalEnd;
+        _connectPro.Core.Events.OnExceptionThrown += OnExceptionThrown;
+
+        ApplyInitialState();
+    }
+
+    partial void OnIsBusyChanged(bool value)
+        => OnPropertyChanged(nameof(CanConnect));
+
+    private void ApplyInitialState()
+    {
+        var handler = _connectPro.Core.ConnectionHandler;
+        var serverAddr = _connectPro.Core.Configuration.ServerAddr;
+
+        if (handler?.IsConnected == true)
         {
-            // Refresh operator list when device retrieval ends
+            ApplyUiStatus(UiConnectionState.Connected, serverAddr);
             RefreshOperatorList();
-        };
+            return;
+        }
+
+        if (handler?.IsReconnecting == true)
+        {
+            ApplyUiStatus(UiConnectionState.Connecting, serverAddr);
+            return;
+        }
+
+        ApplyUiStatus(UiConnectionState.Disconnected);
     }
 
     private void LoadSavedConfiguration()
@@ -70,7 +122,7 @@ public partial class ConfigurationViewModel : ObservableObject
             Port = saved.Port ?? "8086";
             Realm = saved.Realm ?? "";
             UserName = saved.UserName ?? "";
-            Password = saved.Password ?? "";
+            Password = Cryptography.Decrypt(saved.Password ?? "");
 
             // Keep this and apply it when we have options to match against.
             _loadedOperatorDirNo = saved.OperatorDirNo;
@@ -90,18 +142,59 @@ public partial class ConfigurationViewModel : ObservableObject
             Port = Port,
             Realm = Realm,
             UserName = UserName,
-            Password = Password, // TODO: encrypt
+            Password = Cryptography.Encrypt(Password),
             OperatorDirNo = SelectedOperator?.DirNo
         };
 
         _configStore.SaveConfiguration(config);
     }
 
+    private void SetStatus(string status, IBrush brush, bool busy, string? connectedSystem = null)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            ConnectionStatusText = status;
+            ConnectionStatusDisplayBrush = brush;
+            IsBusy = busy;
+
+            if (connectedSystem is not null)
+            {
+                ConnectedSystemDisplay = string.IsNullOrWhiteSpace(connectedSystem) ? "-" : connectedSystem;
+            }
+        });
+    }
+
     private void OnConnectionChanged(object? sender, bool isConnected)
     {
-        ConnectionStatusText = isConnected
-            ? $"Connected to {_connectPro.Core.Configuration.ServerAddr}"
-            : "Not Connected!";
+        if (isConnected)
+        {
+            if (!_connectPro.Core.Collection.RegisteredDevices.Any())
+                ApplyUiStatus(UiConnectionState.ConnectedSynchronizing, _connectPro.Core.Configuration.ServerAddr);
+
+            else
+                ApplyUiStatus(UiConnectionState.Connected, _connectPro.Core.Configuration.ServerAddr);
+        }
+        else
+        {
+            ApplyUiStatus(UiConnectionState.Disconnected);
+        }
+    }
+
+    private void OnDeviceRetrievalEnd(object? sender, EventArgs e)
+    {
+        RefreshOperatorList();
+
+        if (_connectPro.Core.ConnectionHandler?.IsConnected == true)
+        {
+            ApplyUiStatus(
+                UiConnectionState.Synced,
+                _connectPro.Core.Configuration.ServerAddr);
+        }
+    }
+
+    private void OnExceptionThrown(object? sender, Exception ex)
+    {
+        ApplyUiStatus(UiConnectionState.Error, errorMessage: ex.Message);
     }
 
     private void OnOperatorDirNoChanged(object? sender, string dirNo)
@@ -200,10 +293,7 @@ public partial class ConfigurationViewModel : ObservableObject
     {
         try
         {
-            IsBusy = true;
-            OnPropertyChanged(nameof(CanConnect));
-
-            ConnectionStatusText = $"Connecting to {ServerAddr}:{Port}...";
+            ApplyUiStatus(UiConnectionState.Connecting, ServerAddr);
 
             // Persist current config (includes selected operator)
             SaveCurrentConfiguration();
@@ -220,29 +310,88 @@ public partial class ConfigurationViewModel : ObservableObject
                 OperatorDirNo = SelectedOperator?.DirNo
             };
 
+            _connectPro.Core.Configuration = config;
             _connectPro.Core.Events.OnConfigurationChanged?.Invoke(this, config);
 
             // Reconnect SDK with new configuration
             await _connectPro.Core.ConnectionHandler.RecoonectAsync();
-
-            // Refresh operator list from SDK
-            RefreshOperatorList();
-
-            ConnectionStatusText = _connectPro.Core.ConnectionHandler.IsConnected
-                ? $"Connected to {ServerAddr}:{Port}"
-                : "Connection failed - check credentials";
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Connection failed: {ex.Message}");
-            ConnectionStatusText = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            IsBusy = false;
-            OnPropertyChanged(nameof(CanConnect));
+            ApplyUiStatus(UiConnectionState.Error, errorMessage: ex.Message);
         }
     }
 
-    public sealed record OperatorOption(string Display, string? DirNo);
+
+    private void ApplyUiStatus(
+    UiConnectionState state,
+    string? connectedSystem = null,
+    string? errorMessage = null)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            switch (state)
+            {
+                case UiConnectionState.Disconnected:
+                    ConnectionStatusText = "Disconnected";
+                    ConnectionStatusDisplayBrush = Brushes.Red;
+                    IsBusy = false;
+                    ConnectedSystemDisplay = "-";
+                    break;
+
+                case UiConnectionState.Connecting:
+                    ConnectionStatusText = $"Connecting to {ServerAddr}:{Port}...";
+                    ConnectionStatusDisplayBrush = Brushes.Gold;
+                    IsBusy = true;
+                    ConnectedSystemDisplay = NormalizeConnectedSystem(connectedSystem);
+                    break;
+
+                case UiConnectionState.Connected:
+                    ConnectionStatusText = "Connected - Not synced";
+                    ConnectionStatusDisplayBrush = Brushes.Gold;
+                    IsBusy = true;
+                    ConnectedSystemDisplay = NormalizeConnectedSystem(connectedSystem);
+                    break;
+
+                case UiConnectionState.ConnectedSynchronizing:
+                    ConnectionStatusText = "Connecting - retrieving devices...";
+                    ConnectionStatusDisplayBrush = Brushes.Gold;
+                    IsBusy = true;
+                    ConnectedSystemDisplay = NormalizeConnectedSystem(connectedSystem);
+                    break;
+
+                case UiConnectionState.Synced:
+                    ConnectionStatusText = "Connected";
+                    ConnectionStatusDisplayBrush = Brushes.LightGray;
+                    IsBusy = false;
+                    ConnectedSystemDisplay = NormalizeConnectedSystem(connectedSystem);
+                    break;
+
+                case UiConnectionState.Error:
+                    ConnectionStatusText = string.IsNullOrWhiteSpace(errorMessage)
+                        ? "Error"
+                        : $"Error: {errorMessage}";
+
+                    ConnectionStatusDisplayBrush = Brushes.OrangeRed;
+                    IsBusy = false;
+                    ConnectedSystemDisplay = "-";
+                    break;
+
+                default:
+                    ConnectionStatusText = "Unknown";
+                    ConnectionStatusDisplayBrush = Brushes.OrangeRed;
+                    IsBusy = false;
+                    ConnectedSystemDisplay = "-";
+                    break;
+            }
+        });
+    }
+
+    private static string NormalizeConnectedSystem(string? connectedSystem)
+    {
+        return string.IsNullOrWhiteSpace(connectedSystem)
+            ? "-"
+            : connectedSystem;
+    }
 }

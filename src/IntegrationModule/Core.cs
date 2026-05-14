@@ -238,7 +238,7 @@ namespace ConnectPro
             {
                 if (isConnected)
                 {
-                    Events.OnDeviceRetrievalStart?.Invoke(this, EventArgs.Empty);
+                    //Events.OnDeviceRetrievalStart?.Invoke(this, EventArgs.Empty);
                 }
             }
             catch (Exception exe)
