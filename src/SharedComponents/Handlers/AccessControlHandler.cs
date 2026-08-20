@@ -89,8 +89,13 @@ namespace ConnectPro.Handlers
                 }
                 else
                 {
-                    OpenDoorEventData.EventInformationMessage = response.CompletionText;
-                    OpenDoorEventData.IsSuccess = false;
+                    OpenDoorEventData = new OpenDoorEventData()
+                    {
+                        FromDirno = operatorDirNo,
+                        DoorDirno = ele.dirno,
+                        EventInformationMessage = "Open door request failed. No response received.",
+                        IsSuccess = false
+                    };
                     _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
                 }
             }

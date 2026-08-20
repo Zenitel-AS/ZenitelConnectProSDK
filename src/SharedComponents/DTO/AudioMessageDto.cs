@@ -32,7 +32,7 @@ namespace ConnectPro.DTO
         /// Gets or sets the directory number identifier.
         /// </summary>
         [JsonProperty("dirno_id")]
-        public int DirnoId { get; set; }
+        public int? DirnoId { get; set; }
 
         /// <summary>
         /// Gets or sets the display name of the audio message.
@@ -68,19 +68,19 @@ namespace ConnectPro.DTO
         /// Gets or sets the file size of the audio message in bytes.
         /// </summary>
         [JsonProperty("filesize")]
-        public int FileSize { get; set; }
+        public int? FileSize { get; set; }
 
         /// <summary>
         /// Gets or sets the unique message identifier.
         /// </summary>
         [JsonProperty("message_id")]
-        public int MessageId { get; set; }
+        public int? MessageId { get; set; }
 
         /// <summary>
         /// Gets or sets the number of repetitions for the audio message.
         /// </summary>
         [JsonProperty("repetitions")]
-        public int Repetitions { get; set; }
+        public int? Repetitions { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the audio message is currently playing.
@@ -100,17 +100,17 @@ namespace ConnectPro.DTO
             return new AudioMessage
             {
                 Id = this.Id,
-                Description = this.Description,
-                Dirno = this.Dirno,
-                DirnoId = this.DirnoId,
-                DisplayName = this.DisplayName,
-                Duration = this.Duration,
-                FeatureType = this.FeatureType,
-                FileName = this.FileName,
-                FilePath = this.FilePath,
-                FileSize = this.FileSize,
-                MessageId = this.MessageId,
-                Repetitions = this.Repetitions,
+                Description = this.Description ?? string.Empty,
+                Dirno = this.Dirno ?? string.Empty,
+                DirnoId = this.DirnoId ?? 0,
+                DisplayName = this.DisplayName ?? string.Empty,
+                Duration = this.Duration ?? 0,
+                FeatureType = this.FeatureType ?? string.Empty,
+                FileName = this.FileName ?? string.Empty,
+                FilePath = this.FilePath ?? string.Empty,
+                FileSize = this.FileSize ?? 0,
+                MessageId = this.MessageId ?? 0,
+                Repetitions = this.Repetitions ?? 0,
                 IsPlaying = this.IsPlaying
             };
         }
@@ -125,17 +125,17 @@ namespace ConnectPro.DTO
             return new AudioMessageDto
             {
                 Id = msg.Id,
-                Description = msg.Description,
-                Dirno = msg.Dirno,
-                DirnoId = msg.DirnoId,
-                DisplayName = msg.DisplayName,
-                Duration = msg.Duration,
-                FeatureType = msg.FeatureType,
-                FileName = msg.FileName,
-                FilePath = msg.FilePath,
-                FileSize = msg.FileSize,
-                MessageId = msg.MessageId,
-                Repetitions = msg.Repetitions,
+                Description = msg.Description ?? string.Empty,
+                Dirno = msg.Dirno ?? string.Empty,
+                DirnoId = msg.DirnoId ?? 0,
+                DisplayName = msg.DisplayName ?? string.Empty,
+                Duration = msg.Duration ?? 0,
+                FeatureType = msg.FeatureType ?? string.Empty,
+                FileName = msg.FileName ?? string.Empty,
+                FilePath = msg.FilePath ?? string.Empty,
+                FileSize = msg.FileSize ?? 0,
+                MessageId = msg.MessageId ?? 0,
+                Repetitions = msg.Repetitions ?? 0,
                 IsPlaying = msg.IsPlaying
             };
         }

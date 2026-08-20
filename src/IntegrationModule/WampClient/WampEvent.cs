@@ -467,7 +467,7 @@ namespace Wamp.Client
             /// <summary>
             /// Directory number identifier.
             /// </summary>
-            public int dirno_id { get; set; }
+            public int? dirno_id { get; set; }
 
             /// <summary>
             /// Display name of the audio message.
@@ -477,7 +477,7 @@ namespace Wamp.Client
             /// <summary>
             /// Time used for replaying the audio message.
             /// </summary>
-            public int duration { get; set; }
+            public int? duration { get; set; }
 
             /// <summary>
             /// Feature type of the audio message.
@@ -497,17 +497,17 @@ namespace Wamp.Client
             /// <summary>
             /// File size of the audio message.
             /// </summary>
-            public int filesize { get; set; }
+            public int? filesize { get; set; }
 
             /// <summary>
             /// Unique message identifier.
             /// </summary>
-            public int message_id { get; set; }
+            public int? message_id { get; set; }
 
             /// <summary>
             /// Number of repetitions for the audio message.
             /// </summary>
-            public int repetitions { get; set; }
+            public int? repetitions { get; set; }
         }
 
 

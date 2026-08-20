@@ -174,6 +174,7 @@ namespace ConnectPro
                     case false:
                         CancelPostConnectWarmup();
                         _postConnectRetrievalTriggered = false;
+                        _events.OnConnectionChanged?.Invoke(this, false);
                         LogConnectionDebug($"Scheduling reconnect. MaxReconnect before decrement={_maxReconnect}");
                         Recconect();
                         break;
