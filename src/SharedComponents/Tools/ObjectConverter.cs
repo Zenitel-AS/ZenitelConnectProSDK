@@ -70,17 +70,8 @@ namespace ConnectPro.Tools
             var convertedList = new List<AudioMessage>(list.Count);
             foreach (var element in list)
             {
-                if (element == null)
-                    continue;
-
-                try
-                {
+                if (element != null)
                     convertedList.Add(new AudioMessage(element));
-                }
-                catch
-                {
-                    
-                }
             }
             return convertedList;
         }

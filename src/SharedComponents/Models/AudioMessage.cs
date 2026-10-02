@@ -73,8 +73,8 @@ namespace ConnectPro.Models
         /// <summary>
         /// Gets or sets the directory number identifier.
         /// </summary>
-        [JsonProperty("dirno_id")]
-        public int? DirnoId { get; set; }
+        [JsonProperty("dirno_id", NullValueHandling = NullValueHandling.Ignore)]
+        public int DirnoId { get; set; }
 
         /// <summary>
         /// Gets or sets the display name of the audio message.
@@ -109,20 +109,20 @@ namespace ConnectPro.Models
         /// <summary>
         /// Gets or sets the file size of the audio message in bytes.
         /// </summary>
-        [JsonProperty("filesize")]
-        public int? FileSize { get; set; }
+        [JsonProperty("filesize", NullValueHandling = NullValueHandling.Ignore)]
+        public int FileSize { get; set; }
 
         /// <summary>
         /// Gets or sets the unique message identifier.
         /// </summary>
-        [JsonProperty("message_id")]
-        public int? MessageId { get; set; }
+        [JsonProperty("message_id", NullValueHandling = NullValueHandling.Ignore)]
+        public int MessageId { get; set; }
 
         /// <summary>
         /// Gets or sets the number of repetitions for the audio message.
         /// </summary>
-        [JsonProperty("repetitions")]
-        public int? Repetitions { get; set; }
+        [JsonProperty("repetitions", NullValueHandling = NullValueHandling.Ignore)]
+        public int Repetitions { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the audio message is currently playing.
@@ -250,15 +250,15 @@ namespace ConnectPro.Models
                 Id = this.Id,
                 Description = this.Description ?? string.Empty,
                 Dirno = this.Dirno ?? string.Empty,
-                DirnoId = this.DirnoId ?? 0,
+                DirnoId = this.DirnoId,
                 DisplayName = this.DisplayName ?? string.Empty,
                 Duration = this.Duration ?? 0,
                 FeatureType = this.FeatureType ?? string.Empty,
                 FileName = this.FileName ?? string.Empty,
                 FilePath = this.FilePath ?? string.Empty,
-                FileSize = this.FileSize ?? 0,
-                MessageId = this.MessageId ?? 0,
-                Repetitions = this.Repetitions ?? 0,
+                FileSize = this.FileSize,
+                MessageId = this.MessageId,
+                Repetitions = this.Repetitions,
                 IsPlaying = this.IsPlaying
             };
         }
@@ -277,15 +277,15 @@ namespace ConnectPro.Models
                 Id = dto.Id,
                 Description = dto.Description ?? string.Empty,
                 Dirno = dto.Dirno ?? string.Empty,
-                DirnoId = dto.DirnoId ?? 0,
+                DirnoId = dto.DirnoId,
                 DisplayName = dto.DisplayName ?? string.Empty,
                 Duration = dto.Duration ?? 0,
                 FeatureType = dto.FeatureType ?? string.Empty,
                 FileName = dto.FileName ?? string.Empty,
                 FilePath = dto.FilePath ?? string.Empty,
-                FileSize = dto.FileSize ?? 0, 
-                MessageId = dto.MessageId ?? 0,
-                Repetitions = dto.Repetitions ?? 0,
+                FileSize = dto.FileSize,
+                MessageId = dto.MessageId,
+                Repetitions = dto.Repetitions,
                 IsPlaying = dto.IsPlaying
             };
         }

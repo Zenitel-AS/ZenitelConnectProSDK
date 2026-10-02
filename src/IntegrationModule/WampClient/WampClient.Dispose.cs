@@ -156,7 +156,7 @@ namespace Wamp.Client
             }
         }
 
-        // WampClient.Dispose.cs (or WampClient.cs) — reset event subscriptions so they re-arm on the next connect
+        // Drops all trace subscriptions on disconnect so they are re-armed on the next connect.
         internal void ResetTraceSubscriptionsForReconnect()
         {
             SafeDisposeStep("TraceAudioDataReceivingDispose", TraceAudioDataReceivingDispose);

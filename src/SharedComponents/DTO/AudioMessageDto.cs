@@ -31,8 +31,8 @@ namespace ConnectPro.DTO
         /// <summary>
         /// Gets or sets the directory number identifier.
         /// </summary>
-        [JsonProperty("dirno_id")]
-        public int? DirnoId { get; set; }
+        [JsonProperty("dirno_id", NullValueHandling = NullValueHandling.Ignore)]
+        public int DirnoId { get; set; }
 
         /// <summary>
         /// Gets or sets the display name of the audio message.
@@ -67,20 +67,20 @@ namespace ConnectPro.DTO
         /// <summary>
         /// Gets or sets the file size of the audio message in bytes.
         /// </summary>
-        [JsonProperty("filesize")]
-        public int? FileSize { get; set; }
+        [JsonProperty("filesize", NullValueHandling = NullValueHandling.Ignore)]
+        public int FileSize { get; set; }
 
         /// <summary>
         /// Gets or sets the unique message identifier.
         /// </summary>
-        [JsonProperty("message_id")]
-        public int? MessageId { get; set; }
+        [JsonProperty("message_id", NullValueHandling = NullValueHandling.Ignore)]
+        public int MessageId { get; set; }
 
         /// <summary>
         /// Gets or sets the number of repetitions for the audio message.
         /// </summary>
-        [JsonProperty("repetitions")]
-        public int? Repetitions { get; set; }
+        [JsonProperty("repetitions", NullValueHandling = NullValueHandling.Ignore)]
+        public int Repetitions { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the audio message is currently playing.
@@ -102,15 +102,15 @@ namespace ConnectPro.DTO
                 Id = this.Id,
                 Description = this.Description ?? string.Empty,
                 Dirno = this.Dirno ?? string.Empty,
-                DirnoId = this.DirnoId ?? 0,
+                DirnoId = this.DirnoId,
                 DisplayName = this.DisplayName ?? string.Empty,
                 Duration = this.Duration ?? 0,
                 FeatureType = this.FeatureType ?? string.Empty,
                 FileName = this.FileName ?? string.Empty,
                 FilePath = this.FilePath ?? string.Empty,
-                FileSize = this.FileSize ?? 0,
-                MessageId = this.MessageId ?? 0,
-                Repetitions = this.Repetitions ?? 0,
+                FileSize = this.FileSize,
+                MessageId = this.MessageId,
+                Repetitions = this.Repetitions,
                 IsPlaying = this.IsPlaying
             };
         }
@@ -127,15 +127,15 @@ namespace ConnectPro.DTO
                 Id = msg.Id,
                 Description = msg.Description ?? string.Empty,
                 Dirno = msg.Dirno ?? string.Empty,
-                DirnoId = msg.DirnoId ?? 0,
+                DirnoId = msg.DirnoId,
                 DisplayName = msg.DisplayName ?? string.Empty,
                 Duration = msg.Duration ?? 0,
                 FeatureType = msg.FeatureType ?? string.Empty,
                 FileName = msg.FileName ?? string.Empty,
                 FilePath = msg.FilePath ?? string.Empty,
-                FileSize = msg.FileSize ?? 0,
-                MessageId = msg.MessageId ?? 0,
-                Repetitions = msg.Repetitions ?? 0,
+                FileSize = msg.FileSize,
+                MessageId = msg.MessageId,
+                Repetitions = msg.Repetitions,
                 IsPlaying = msg.IsPlaying
             };
         }

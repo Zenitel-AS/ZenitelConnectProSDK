@@ -72,32 +72,31 @@ namespace ConnectPro.Handlers
         public void OpenDoor(Device ele, string operatorDirNo)
         {
             wamp_response response = _wamp.PostOpenDoor(ele.dirno);
-            if (response != null)
+            if (response != null && response.CompletionText == "PostOpenDoor sucessfully completed.")
             {
-                if (response.CompletionText == "PostOpenDoor sucessfully completed.")
+                OpenDoorEventData = new OpenDoorEventData()
                 {
-                    OpenDoorEventData = new OpenDoorEventData()
-                    {
-                        FromDirno =  operatorDirNo,
-                        DoorDirno = ele.dirno,
-                        EventInformationMessage = response.CompletionText
-                    };
-                    OpenDoorEventData.TrySetLastEventTimestamp();
+                    FromDirno =  operatorDirNo,
+                    DoorDirno = ele.dirno,
+                    EventInformationMessage = response.CompletionText
+                };
+                OpenDoorEventData.TrySetLastEventTimestamp();
 
-                    OpenDoorEventData.IsSuccess = true;
-                    _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
-                }
-                else
+                OpenDoorEventData.IsSuccess = true;
+                _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
+            }
+            else
+            {
+                OpenDoorEventData = new OpenDoorEventData()
                 {
-                    OpenDoorEventData = new OpenDoorEventData()
-                    {
-                        FromDirno = operatorDirNo,
-                        DoorDirno = ele.dirno,
-                        EventInformationMessage = "Open door request failed. No response received.",
-                        IsSuccess = false
-                    };
-                    _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
-                }
+                    FromDirno = operatorDirNo,
+                    DoorDirno = ele.dirno,
+                    EventInformationMessage = response == null
+                        ? "Open door request failed. No response received."
+                        : $"Open door request failed. {response.CompletionText}",
+                    IsSuccess = false
+                };
+                _events.OnDoorOpen?.Invoke(this, OpenDoorEventData);
             }
         }
 
