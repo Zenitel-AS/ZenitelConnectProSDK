@@ -67,10 +67,11 @@ namespace ConnectPro.Tools
             if (list == null)
                 return new List<AudioMessage>();
 
-            List<AudioMessage> convertedList = new List<AudioMessage>();
-            foreach (WampClient.wamp_audio_messages_element sdkAudioMessageElement in list)
+            var convertedList = new List<AudioMessage>(list.Count);
+            foreach (var element in list)
             {
-                convertedList.Add(new AudioMessage(sdkAudioMessageElement));
+                if (element != null)
+                    convertedList.Add(new AudioMessage(element));
             }
             return convertedList;
         }
@@ -82,6 +83,9 @@ namespace ConnectPro.Tools
         /// <returns>A converted <see cref="AudioMessageWrapper"/> object.</returns>
         public static AudioMessageWrapper ConvertSdkAudioMessageWrapper(WampClient.AudioMessageWrapper sdkAudioMessageWrapper)
         {
+            if (sdkAudioMessageWrapper == null)
+                return new AudioMessageWrapper();
+
             return new AudioMessageWrapper()
             {
                 AudioMessages = ConvertSdkAudioMessageElementList(sdkAudioMessageWrapper.AudioMessages),

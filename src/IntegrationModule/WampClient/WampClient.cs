@@ -365,6 +365,7 @@ namespace Wamp.Client
             StopRenewAccessTokenTimer();
             ResetChannel();
             RemoveCertificateValidationCallback();
+            ResetTraceSubscriptionsForReconnect();
 
             lock (_connectionGate)
             {

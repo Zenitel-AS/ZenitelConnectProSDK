@@ -155,5 +155,20 @@ namespace Wamp.Client
                 // Never allow logging failure to break Dispose().
             }
         }
+
+        // Drops all trace subscriptions on disconnect so they are re-armed on the next connect.
+        internal void ResetTraceSubscriptionsForReconnect()
+        {
+            SafeDisposeStep("TraceAudioDataReceivingDispose", TraceAudioDataReceivingDispose);
+            SafeDisposeStep("TraceAudioDetectorAliveDispose", TraceAudioDetectorAliveDispose);
+            SafeDisposeStep("TraceAudioEventDetectionDispose", TraceAudioEventDetectionDispose);
+            SafeDisposeStep("TraceCallLegEventDispose", TraceCallLegEventDispose);
+            SafeDisposeStep("TraceCallEventDispose", TraceCallEventDispose);
+            SafeDisposeStep("TraceDeviceExtendedStatusEventDispose", TraceDeviceExtendedStatusEventDispose);
+            SafeDisposeStep("TraceDeviceGPIStatusEventDispose", TraceDeviceGPIStatusEventDispose);
+            SafeDisposeStep("TraceDeviceGPOStatusEventDispose", TraceDeviceGPOStatusEventDispose);
+            SafeDisposeStep("TraceDeviceRegistrationEventDispose", TraceDeviceRegistrationEventDispose);
+            SafeDisposeStep("TraceOpenDoorEventDispose", TraceOpenDoorEventDispose);
+        }
     }
 }

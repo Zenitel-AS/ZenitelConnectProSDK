@@ -307,18 +307,28 @@ namespace Wamp.Client
         {
             object res = GET_audio_messages();
 
-            if (res != null)
+            if (res == null)
+                return new AudioMessageWrapper();
+
+            string json_str = res.ToString();
+            OnChildLogString?.Invoke(this, json_str);
+
+            // Deserialize tolerantly: the whole list is parsed in a single call, so one malformed
+            // field (e.g. a null numeric such as "duration") would otherwise abort the entire batch
+            // and we would lose every message. The error handler logs and skips only the offending
+            // member, leaving it at its default, and lets the rest of the records deserialize.
+            var settings = new Newtonsoft.Json.JsonSerializerSettings
             {
-                string json_str = res.ToString();
-                OnChildLogString?.Invoke(this, json_str);
-                AudioMessageWrapper audioMessageElementsList = Newtonsoft.Json.JsonConvert.DeserializeObject<AudioMessageWrapper>(json_str);
-                return audioMessageElementsList;
-            }
-            else
-            {
-                AudioMessageWrapper audioMessageElementsList = new AudioMessageWrapper();
-                return audioMessageElementsList;
-            }
+                Error = (sender, args) =>
+                {
+                    OnChildLogString?.Invoke(this,
+                        $"Skipped malformed audio message field '{args.ErrorContext.Path}': {args.ErrorContext.Error.Message}");
+                    args.ErrorContext.Handled = true;
+                }
+            };
+
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<AudioMessageWrapper>(json_str, settings)
+                   ?? new AudioMessageWrapper();
         }
 
         /// <summary>

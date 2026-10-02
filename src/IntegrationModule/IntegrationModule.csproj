@@ -23,7 +23,8 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageId>Zenitel.ConnectPro.SDK</PackageId>
-		<Version>1.2.6</Version>
+		<!-- NuGet package version. Safe to bump every release. -->
+		<Version>1.2.7</Version>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -57,8 +58,11 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<!-- Generates .snupkg -->
 		<Deterministic>true</Deterministic>
-		<FileVersion>1.2.6</FileVersion>
-		<AssemblyVersion>1.2.6</AssemblyVersion>
+		<!-- NOTE: <AssemblyVersion>/<FileVersion> are deliberately NOT set here.
+		     <GenerateAssemblyInfo>false</GenerateAssemblyInfo> above makes them inert, so
+		     setting them here silently does nothing (1.2.6.6 here still produced a 1.1.0.0
+		     binary). The real values live in Properties/AssemblyInfo.cs - read the
+		     versioning notes there before changing anything. -->
 		<Title>Zenitel Connect Pro SDK</Title>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<!-- Ensures builds are reproducible -->
